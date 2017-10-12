@@ -33,9 +33,10 @@ package_types = {
 	0x84ff:	"Client-bye",
 	0x85ff:	"Heartbeat",
 	0x8aff:	"?+Heartbeat",
+	0x44ff:	"Error",
 	0x01ff:	"Heartbeat-Ack",
-	0x0700:	"Data",
 	0x8600:	"Sector",
+	0x0700:	"Data",
 	0x0100:	"Sector-Ack",
 }
 
@@ -168,6 +169,8 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 				socket.sendto(compose_hello(number, package), client)
 				thread.start()
 				map_changed_event.set()
+			if package["type"] == "Error":
+				unregister_connection(client)
 			elif client in connections:	#no lock
 				if package["type"] == "Client-bye":
 					socket.sendto(ack("Heartbeat-Ack",package), client)
@@ -187,11 +190,14 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 								package["Ship-Name"] = sector["Ship-Name"]
 							socket.sendto(compose_data(client,compose_map_sector(sector)), client)
 					elif package["subtype"] == "Sector-Leave":
-						engine.game.leave_sector(package["Ship-Name"],package["ID"],client)
+						engine.game.clear_sector(package["Ship-Name"],package["ID"],client)
 					elif package["subtype"] == "Sector-Kill":
 						engine.game.kills_in_sector(package["Ship-Name"],package["ID"],package["Kills"],client)
 			else:
-				warn("client not in connections list")
+				warn("client not in connections list. Waiting for client to reconnect.")
+
+
+#Here follows package assambley
 
 def ack(subtype, orig_package):
 	"""creates an ack package to ack heartbeats or sectors"""
@@ -242,13 +248,13 @@ def compose_map_col(index, column_data):
 	subtype = package_subtypes_encode["Data-Map"]
 	sectors = struct.pack(">Hb",subtype,index)
 	for s in column_data:
-		sector = struct.pack("<bbbHbbH", s["Rear_Bases"], s["Forward_Bases"], s["Fire_Bases"], s["Enemies"], s["Hidden"], s["?"], len(s["Name"])) + bytes(s["Name"], "utf-8")
+		sector = struct.pack("<bbbHbbH", s["Rear_Bases"], s["Forward_Bases"], s["Fire_Bases"], s["Enemies"], s["Hidden"], s["Terrain"], len(s["Name"])) + bytes(s["Name"], "utf-8")
 		sectors += sector
 	return sectors
 
 def compose_map_sector(s):
 	subtype = struct.pack(">H",package_subtypes_encode["Data-Sector"])
-	return subtype + struct.pack("<HbbbbHxxHxxbxxxb", s["Enemies"], s["Rear_Bases"], s["Forward_Bases"], s["Fire_Bases"], s["Allies?"], s["Seed"], s["ID"], s["Difficulty"], s["?"])
+	return subtype + struct.pack("<HbbbbHxxHxxbxxxb", s["Enemies"], s["Rear_Bases"], s["Forward_Bases"], s["Fire_Bases"], s["??"], s["Seed"], s["ID"], s["Difficulty"], s["Terrain"])
 
 def compose_ships(ships:dict):
 	#ship: (shipname,x,y,sector["ID"],sector["Enemies"])
@@ -270,6 +276,9 @@ def compose_turn_over():
 def compose_shipname(name):
 	subtype = package_subtypes_encode["Data-Ship-Name"]
 	return struct.pack(">H",subtype) + struct.pack("<H",len(name)) + bytes(name, "utf-8")
+
+
+#Here follows package dissassembly
 
 def dissect(data):
 	"""
@@ -328,6 +337,10 @@ def dissect(data):
 			if int.from_bytes(data[0:], byteorder="big") != 0:
 				raise ValueError
 			data = []
+		elif subtype == "Error":
+			if int.from_bytes(data[0:], byteorder="big") != 0:
+				raise ValueError
+			data = []
 		elif subtype == "Heartbeat":
 			pass
 		elif subtype == "?+Heartbeat":
@@ -348,15 +361,15 @@ def dissect(data):
 				package["Y"] = int(data[1])
 				data = data[2:]
 			elif subsubtype == "Sector-Leave":
-				package["ID"] = int.from_bytes(data[0:2], byteorder="big")
+				package["ID"] = int.from_bytes(data[0:2], byteorder="little")
 				if int.from_bytes(data[2:4], byteorder="big") != 0:
 					raise ValueError
 				data = data[4:]
 			elif subsubtype == "Sector-Kill":
-				package["ID"] = int.from_bytes(data[0:2], byteorder="big")
+				package["ID"] = int.from_bytes(data[0:2], byteorder="little")
 				if int.from_bytes(data[2:4], byteorder="big") != 0:
 					raise ValueError
-				package["Kills"] = struct.unpack(">I", data[4:8])
+				package["Kills"] = int.from_bytes(data[4:8], byteorder="little")
 				data = data[8:]
 			else:
 				warn("WTF?")

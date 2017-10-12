@@ -13,7 +13,16 @@ from collections import Counter
 __author__ 	= "Pithlit"
 __version__	= 0.0
 
-
+#not used now, but these strings are diplayed in Artemis when you transmit the corresponding numbers
+terrain_types = {
+	"Sector":					0,		
+	"Nebula":               	1,	
+	"Minefield":            	2,	
+	"Asteroid Belt":        	3,	
+	"Black Hole Nursery":   	4,	
+	"Wildlands":            	5,	
+	"Crossroads":           	6,	
+}
 
 class Game:
 	"""
@@ -31,8 +40,8 @@ class Game:
 			"Invasion Beachheads":		1,
 			"Empty Sectors":			7,	#This is more exactly than in the original WarServer.
 			"Total Turns":				5,
-			"Minutes per Turn":			5,
-			"Minutes between Turns (interlude)":	1,
+			"Minutes per Turn":			5.5,	#accepts float
+			"Minutes between Turns (interlude)":	1.5,	#accepts float
 			"Bugfix: Beachheads off by one":	True,	#Probably a bug in the original WarServer.
 			"Randomize Beachheads":		False,
 			"Neighbour Invading Function":	lambda x,y: [(x,y),(x+1,y),(x-1,y),(x,y+1)],	#in the original WarServer enemies never go to the north.
@@ -60,14 +69,14 @@ class Game:
 				if callable(diff):
 					diff = diff(col,row)
 				sector = {
-					"Enemies":			random.randrange(2), #0,
+					"Enemies":			0,
 					"Rear_Bases":		random.randrange(4),	#0 to 3
 					"Forward_Bases":	random.randrange(2),	#0 to 1
 					"Fire_Bases":		0,
-					"?":				18,
+					"Terrain":			random.randrange(7),	
 					"Seed":				random.randrange(16**4),
 					"Difficulty":		diff,	
-					"??":				4,
+					"??":				col,	#TODO
 					"Hidden":			False,
 					"Name":				"Sektor",
 					"pending_invaders":	0
@@ -97,7 +106,9 @@ class Game:
 		self.notifications = []
 		self.timer_thread = threading.Timer(self.settings["Minutes per Turn"]*60, self._next_turn)
 		for i in range(6):
+			self._defeat_bases(self.map)
 			self._enemies_proceed(self.map)
+			self._enemies_spawn(self.map)
 		self.timer_thread.start()
 		print("Game Engine started")
 
@@ -146,24 +157,21 @@ class Game:
 					if self.ships[key][1] == x and self.ships[key][2] == y:
 						return None	#Sector Forbidden 
 			sector = copy.deepcopy(self.map[x][y])
+			if sector["Enemies"] <= 0:
+				return None	#Dont enter sectors without enemies
+			if sector["Hidden"]:
+				return None	#Dont enter hidden sectors
 			sector.update({
-				"Enemies":	5,
-				"Rear_Bases":	3,
-				"Forward_Bases":	2,
-				"Fire_Bases":	1,
-				"Allies?":	4,
-				"Seed":		0x1234,
-				"ID":		0x5678,
-				"Difficulty":	9,
-				"Map_specific?":	8,
+				"ID":			random.randrange(16**4),
 				"Ship-Name":	"Tessel",
 			})
 			if sector.get("Ship-Name") is not None:
 				shipname = sector["Ship-Name"]
-			#TODO check what stuff is. compare to map dict
 			self.ships[client] = (shipname,x,y,sector["ID"],sector["Enemies"])
 			self._map_changed()
-			return sector
+		print(sector)
+		print(shipname + " entered sector " + chr(x+ord('A')) + str(y) +"." )
+		return sector
 
 	def clear_sector(self,shipname,id,client):
 		"""
@@ -173,6 +181,8 @@ class Game:
 		with self.lock:
 			assert client in self.ships
 			battle = self.ships[client]
+			x = battle[1]
+			y = battle[2]
 			self.scoreboard_kills[shipname] += battle[4]
 			self.ships[client] = (shipname,-1,-1,0,0)
 			if self.map[battle[1]][battle[2]]["Enemies"] > 0:
@@ -180,6 +190,7 @@ class Game:
 				self.scoreboard_clears[shipname] += 1
 			self.map[battle[1]][battle[2]]["Enemies"] = 0
 			self._map_changed()
+		print(shipname + " cleared sector " + chr(x+ord('A')) + str(y) +"." )
 
 	def kills_in_sector(self,shipname,id,kills,client):
 		"""
@@ -193,6 +204,7 @@ class Game:
 			assert battle[3] == id
 			self.ships[client] = (battle[0], battle[1], battle[2], battle[3], battle[4]-kills)
 			self.scoreboard_kills[shipname] += kills
+		print(shipname + " defeated " + str(kills) + " enem" + ("y" if kills == 1 else "ies") + " in sector " + chr(battle[1]+ord('A')) + str(battle[2]) +"." )
 
 	def disconnect_client(self, client):
 		"""When a client disconects, free the sector"""
@@ -223,6 +235,7 @@ class Game:
 			else:
 				self._defeat_bases(self.map)
 				self._enemies_proceed(self.map)
+				self._enemies_spawn(self.map)
 				for client in self.ships:
 					self.ships[client] = (self.ships[client][0],-1,-1,0,0)	#clear all the shipnames
 				self.turn["turn_number"] += 1
@@ -246,9 +259,26 @@ class Game:
 						sector["Forward_Bases"] = 0
 						sector["Fire_Bases"] = 0
 
+	def _enemies_spawn(self,map):
+		"""
+		Enemies enter the map.
+		The map given as argument is modified in-place.
+		You may call this method with a copy of the games map,
+		so you can see what happens without modifying the actual map.
+		"""
+		with self.lock:
+			enemies = self.settings["Invaders Per Turn"] // len(self.beachhead_columns)
+			plus_one = self.settings["Invaders Per Turn"] % len(self.beachhead_columns)
+			for col in self.beachhead_columns:
+				map[col][0]["Enemies"] += enemies
+				if plus_one > 0:
+					map[col][0]["Enemies"] += 1
+					plus_one -= 1
+
+			
 	def _enemies_proceed(self,map):
 		"""
-		Enemies enter the map and move around.
+		Enemies move around.
 		The map given as argument is modified in-place.
 		You may call this method with a copy of the games map,
 		so you can see what happens without modifying the actual map.
@@ -275,26 +305,8 @@ class Game:
 				for row in range(8):
 					map[col][row]["Enemies"] += map[col][row]["pending_invaders"]
 					map[col][row]["pending_invaders"] = 0
-		
 
-class DefaultGame(Game):
-	def get_map(who):
-		pass
 
-	def get_sector(x,y,who):
-		#dummy sector
-		sector = {
-			"Enemies":	5,
-			"Bases 1":	3,
-			"Bases 2":	2,
-			"Bases 3":	1,
-			"Allies?":	4,
-			"Seed":		0x1234,
-			"ID":		0x5678,
-			"Difficulty":	9,
-			"Map_specific?":	8,
-			"Ship-Name":	"Tessel",
-		}
-		return sector
 
 game=Game({})
+
