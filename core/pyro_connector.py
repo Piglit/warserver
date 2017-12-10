@@ -36,6 +36,10 @@ class Observer:
 	def get_settings(self):
 		return copy.deepcopy(engine.game.get_settings(client=self.role))
 
+	def get_beachheads(self):
+		return copy.deepcopy(engine.game.get_beachheads(client=self.role))
+
+
 @Pyro4.expose
 class Admiral(Observer):
 	"""
@@ -72,25 +76,23 @@ class GM(Observer):
 	def __init__(self):
 		self.role = "GM"
 
-	def change_sector(self, x, y, updates):
+	def change_sector(self, x, y, key, value):
 		"""
 			x and y are coordinates of the sector.
-			updates is a dict of keys in sector -> difference of a value.
-			E.g. {"Enemies": -3, "Rear_Bases": +1} removes 3 enemies and place 1 rear base in the sector.
+			key,value must be in sector/
 			"Name"(string) and "Hidden"(bool) values replace old values.
 		"""
 		assert type(x) == int, "x must be int"
 		assert type(y) == int, "y must be int"
 		assert x >= 0 and x < 8, "0 <= x <= 7"
 		assert y >= 0 and y < 8, "0 <= y <= 7"
-		assert type(updates) is dict
-		for k,v in updates:
-			assert(engine.game.get_map(client=self.role)[x][y][k] is not None, str(k)+" does not exist in sector.")
-		for k,v in updates:
-			if type(v) == bool or type(v) == str:
-				engine.game.update_sector(x,y,k,v)
-			else:
-				engine.game.change_sector(x,y,k,v)
+		assert key in engine.game.get_map(client=self.role)[x][y], str(key)+" does not exist in sector."
+		if type(value) == bool or type(value) == str:
+			engine.game.update_sector(x,y,key,value)
+		elif type(value) == int:
+			engine.game.change_sector(x,y,key,value)
+		else:
+			assert False, "Type Error"
 		return True	
 
 	def change_turn_number(self, n):
@@ -125,6 +127,19 @@ class GM(Observer):
 		assert type(value) == int
 		engine.game.change_scoreboard_clears(shipname,value)
 
+	def add_beachhead(self,x,y):
+		assert type(x) == int, "x must be int"
+		assert type(y) == int, "y must be int"
+		assert x >= 0 and x < 8, "0 <= x <= 7"
+		assert y >= 0 and y < 8, "0 <= y <= 7"
+		engine.game.add_beachhead(x,y)
+
+	def remove_beachhead(self,x,y):
+		assert type(x) == int, "x must be int"
+		assert type(y) == int, "y must be int"
+		assert x >= 0 and x < 8, "0 <= x <= 7"
+		assert y >= 0 and y < 8, "0 <= y <= 7"
+		engine.game.remove_beachhead(x,y)
 
 @Pyro4.expose
 class Advanced(Observer):

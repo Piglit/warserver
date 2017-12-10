@@ -105,8 +105,6 @@ class Game:
 				sector["Hidden"] = True
 		del self.settings["Empty Sectors"]	#irrelevant from now on
 
-
-
 		self.turn = {
 			"turn_number":	1,
 			"max_turns":	self.settings["Total Turns"],
@@ -171,16 +169,18 @@ class Game:
 		with self.lock:
 			return self.settings
 
+	def get_beachheads(self, client=None):
+		with self.lock:
+			return self.beachheads
+		
+
 	#setter methods
 
 	def update_sector(self, x, y, key, value):
 		"""sets one value of a sector. Used for GM or Admiral."""
 		with self.lock:
-			try:
-				assert(type(self.map[x][y][key]) == type(value))
-				self.map[x][y][key] = value
-			except Exception as e:
-				print(e)
+			assert type(self.map[x][y][key]) == type(value) , "value has the wrong type"
+			self.map[x][y][key] = value
 
 	def change_sector(self, x, y, key, diff):
 		"""
@@ -188,11 +188,8 @@ class Game:
 		To prevent race conditions change_sector sould be used instead of update_sector from connected clients.
 		"""
 		with self.lock:
-			try:
-				assert(type(self.map[x][y][key]) == type(diff))
-				self.map[x][y][key] += diff
-			except Exception as e:
-				print(e)
+			assert type(self.map[x][y][key]) == type(diff) , "value has the wrong type"
+			self.map[x][y][key] += diff
 
 	def change_base_points(self,diff):
 		"""changes base points about diff"""
@@ -245,6 +242,17 @@ class Game:
 	def change_scoreboard_clears(self,shipname,value):
 		with self.lock:
 			self.scoreboard_clears[shipname] += value
+
+	def add_beachhead(self,x,y):
+		#there one beachhead may occure multiple times in this list. this results in a higher amount of enemies in that sector
+		with self.lock:
+			return self.beachheads.append((x,y))
+
+	def remove_beachhead(self,x,y):
+		#removes the first occurence of the beachhead from the list.
+		with self.lock:
+			if (x,y) in self.beachheads:
+				self.beachheads.remove((x,y))
 
 	#artemis connected interaction
 
