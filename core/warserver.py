@@ -15,8 +15,9 @@ if __name__ == "__main__":
 	#if throws an exception if files can not be found
 
 	config.read_file(args.config)
-	print(config['server'])
 
+	print("This is the headless python Artemis warserver.")
+	print("Configuration loaded from file "+str(args.config.name))
 	engine.game=engine.Game(config['server'])	
 	#engine.start_game=(config['original'])	
 	artemis_connector.start_server()

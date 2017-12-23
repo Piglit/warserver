@@ -402,4 +402,4 @@ def start_server():
 	engine.game.register_notification(map_changed_event)
 	threading.Thread(target=notify).start()
 	threading.Thread(target=server.serve_forever).start()
-	print("Server is listening")
+	print("Server is listening for Artemis clients. Choose 'connect to WarServer' in the Artemis server menu.")

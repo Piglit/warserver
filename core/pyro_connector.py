@@ -1,4 +1,9 @@
-import Pyro4
+try:
+	import Pyro4
+	pyro_avail = True
+except ImportError:
+	pyro_avail = False
+
 import threading
 import copy
 
@@ -39,18 +44,13 @@ class Observer:
 	def get_beachheads(self):
 		return copy.deepcopy(engine.game.get_beachheads(client=self.role))
 
-
-@Pyro4.expose
-class Admiral(Observer):
-	"""
-	The Admiral adapter class provides an interface for the Admiral.
-	He can view the base points and place bases.
-	"""
-	def __init__(self):
-		self.role = "Admiral"
-
 	def get_base_points(self):
 		return copy.deepcopy(engine.game.get_base_points(client=self.role))
+
+@Pyro4.expose
+class GM(Observer):
+	def __init__(self):
+		self.role = "GM"
 
 	def place_base(self,x,y,base_value):
 		""" x and y are coordinates of the sector
@@ -58,7 +58,7 @@ class Admiral(Observer):
 		"""
 		assert type(x) == int and type(y) == int and type(base_value) == int
 		assert x >= 0 and x <= 7 and y >= 0 and y <= 7 and base_value >= 1 and base_value <= 3
-		if base_value > engine.game.get_base_points(client=self.role):
+		if base_value > engine.game.get_base_points(client="Admiral"):
 			return False
 		base_type = ""
 		if base_value == 1:
@@ -71,10 +71,6 @@ class Admiral(Observer):
 		engine.game.change_sector(x,y,base_type,1)
 		return True
 
-@Pyro4.expose
-class GM(Observer):
-	def __init__(self):
-		self.role = "GM"
 
 	def change_sector(self, x, y, key, value):
 		"""
@@ -141,19 +137,16 @@ class GM(Observer):
 		assert y >= 0 and y < 8, "0 <= y <= 7"
 		engine.game.remove_beachhead(x,y)
 
-@Pyro4.expose
-class Advanced(Observer):
-	def __init__(self):
-		self.role = "Advanced"
-
-
 def start_pyro_server():
-	daemon = Pyro4.Daemon()
-	nameserver = Pyro4.locateNS()
-	#nameserver.register("warserver_observer", daemon.register(Observer))
-	nameserver.register("warserver_admiral",daemon.register(Admiral))
-	nameserver.register("warserver_game_master",daemon.register(GM))
-	#nameserver.register("warserver_advanced_game_master",daemon.register(Advanced))
-
-	threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls
-	print('Pyro server running. Connect with Pyro4.Proxy("PYRONAME:warserver_admiral")')
+	if pyro_avail:
+		daemon = Pyro4.Daemon()
+		uri = daemon.register(GM)
+		try:
+			nameserver = Pyro4.locateNS()
+			nameserver.register("warserver_game_master",uri)
+			print('Pyro server running. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+		except Pyro4.errors.NamingError:
+			print('Pyro server running. No Pyro name server found. Connect custom python clients from localhost with Pyro4.Proxy("'+str(uri)+'")')
+		threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls
+	else:
+		print('Pyro module not available. Install pyro if you want to use custom python clients or an interactive shell.')

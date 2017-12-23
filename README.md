@@ -3,26 +3,53 @@ an inofficial reimplementation of the Artemis SBS Warserver.
 
 DEPENDENCIES
 python3
-pyro (python-pyro)
+java (optional, needed for the graphical user interface)
+pyro (python-pyro) (optional, needed for the command line interface)
+
 
 USEAGE
+There are two ways to run the warserver:
+a) with java gui (recomended)
+b) headless with python cli (for hackers)
+
+a) run java INSERT NAME HERE.
+Configure the WarServer as you wish.
+Press "Start WarServer".
+The WarServer is running now and waiting for connections.
+
+To start the interface, start the java client TODO NAME OF THE COMMAND on any computer inside your network.
+Enter the IP-Address of the WarServer.
+On the WarServer screen add the permission level.
+
+b)
+If you want to connect interactive python clients, run:
 python -m Pyro4.naming
-this starts a pyro nameserver, so you can connect admiral and game-master interfaces to the warserver
+before starting the WarServer.
 
-python warserver.py
-this will start the warserver. Now you can connect your Artemis server to it (click 'Connect to WarServer' in server menu and enter the ip-address of the machine running the warserver)
+run warserver.py
+The configuration of the WarServer is loaded from settings.cfg.
+The WarServer is running now and waiting for connections.
 
-now start the gui you like (not implemented yet)
-you may also connect from another python script or ipython:
-Pyro4.Proxy("PYRONAME:warserver_admiral")
-Pyro4.Proxy("PYRONAME:warserver_game_master")
+To connect a python client, call:
+game=Pyro4.Proxy('PYRONAME:warserver_game_master')
+from your python client.
 
-EXAMPLEs:
-game = Pyro4.Proxy("PYRONAME:warserver_admiral")
-game.get_game_state()
+If you want to use an interactive shell as client, enter:
+ipython -i -c "import Pyro4; game=Pyro4.Proxy('PYRONAME:warserver_game_master')"
+Now you can call the methods of the game object to interact with the WarServer.
+To show available commands, enter dir(game). Ignore methods that start with _.
 
-returns the game state
 
-dir(game)
+CONNECT ARTEMIS
 
-lists all methods you can call. Ignore the private ones (they start with _)
+Start Artemis on any computer inside your network.
+Press "Start Server".
+Press "Join War Server".
+Enter the IP-Address or URL of the machine running the WarServer.
+Press "Connect To War Server".
+
+Now Artemis clients can connect to the Artemis Server.
+They must enter the IP-Address of the Artemis Server, not the Address of the WarServer.
+
+
+
