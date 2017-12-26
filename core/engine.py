@@ -80,6 +80,8 @@ class Game:
 			self.map.append([])
 			for row in range(0,8):
 				sector = {
+					"x":				col,
+					"y":				row,
 					"Enemies":			0,
 					"Rear_Bases":		random.randrange(4),	#0 to 3
 					"Forward_Bases":	random.randrange(2),	#0 to 1
@@ -117,14 +119,14 @@ class Game:
 		self.base_points = 0
 		self.scoreboard_kills = Counter()
 		self.scoreboard_clears= Counter()
-		self.lock = threading.RLock()
-		self.notifications = []
-		self.timer_thread = threading.Timer(self.settings["Minutes per Turn"]*60, self._next_turn)
+		self._lock = threading.RLock()
+		self._notifications = []
+		self._timer_thread = threading.Timer(self.settings["Minutes per Turn"]*60, self._next_turn)
 		for i in range(6):
 			self._defeat_bases(self.map)
 			self._enemies_proceed(self.map)
 			self._enemies_spawn(self.map)
-		self.timer_thread.start()
+		self._timer_thread.start()
 		print("Game Engine started")
 
 	# getter methods
@@ -137,13 +139,13 @@ class Game:
 		If client is a tuple: (ip_address, port) or a string like "admirals_map", 
 		this method may decide to restrict information, depending on who is requesting the map.
 		"""
-		with self.lock:
+		with self._lock:
 			return self.map 
 			#warning: the caller may change the map. You may prevent this by returning a copy of the map. See deepcopy()
 
 	def get_turn_status(self, client=None):
 		"Returns the turn dict with the seconds remaining as float"
-		with self.lock:
+		with self._lock:
 			turn = self.turn
 			remaining = turn["turn_started"] - time.time()
 			if turn["interlude"]:
@@ -154,23 +156,23 @@ class Game:
 			return turn
 
 	def get_ships(self, client=None):
-		with self.lock:
+		with self._lock:
 			return self.ships
 
 	def get_base_points(self, client=None):
-		with self.lock:
+		with self._lock:
 			return self.base_points
 
 	def get_scoreboard(self, client=None):
-		with self.lock:
+		with self._lock:
 			return (self.scoreboard_clears, self.scoreboard_kills)
 
 	def get_settings(self, client=None):
-		with self.lock:
+		with self._lock:
 			return self.settings
 
 	def get_beachheads(self, client=None):
-		with self.lock:
+		with self._lock:
 			return self.beachheads
 		
 
@@ -178,7 +180,7 @@ class Game:
 
 	def update_sector(self, x, y, key, value):
 		"""sets one value of a sector. Used for GM or Admiral."""
-		with self.lock:
+		with self._lock:
 			assert type(self.map[x][y][key]) == type(value) , "value has the wrong type"
 			self.map[x][y][key] = value
 
@@ -187,40 +189,40 @@ class Game:
 		changes one value of a sector. Used for GM or Admiral.
 		To prevent race conditions change_sector sould be used instead of update_sector from connected clients.
 		"""
-		with self.lock:
+		with self._lock:
 			assert type(self.map[x][y][key]) == type(diff) , "value has the wrong type"
 			self.map[x][y][key] += diff
 
 	def change_base_points(self,diff):
 		"""changes base points about diff"""
-		with self.lock:
+		with self._lock:
 			self.base_points += diff
 
 	def change_turn_number(self, n):
-		with self.lock:
+		with self._lock:
 			self.turn["turn_number"] += n
 
 	def change_max_turns(self, n):
-		with self.lock:
+		with self._lock:
 			self.turn["max_turns"] += n
 
 	def end_turn(self):
-		with self.lock:
+		with self._lock:
 			self._next_turn()
 
 	def change_turn_time_remaining(self,seconds):
-		with self.lock:
-			self.timer_thread.cancel()
+		with self._lock:
+			self._timer_thread.cancel()
 			self.turn['turn_started'] += seconds
 			turn = self.get_turn_status()
 			if turn["remaining"] > 0:
-				self.timer_thread = threading.Timer(turn["remaining"], self._next_turn)
-				self.timer_thread.start()
+				self._timer_thread = threading.Timer(turn["remaining"], self._next_turn)
+				self._timer_thread.start()
 			else:
 				self._next_turn()
 
 	def change_setting(self,setting,value):
-		with self.lock:
+		with self._lock:
 			try:
 				assert(type(self.settings[key]) == type(value))
 				self.settings[key] += value
@@ -228,7 +230,7 @@ class Game:
 				print(e)
 
 	def set_setting(self,setting,value):
-		with self.lock:
+		with self._lock:
 			try:
 				assert(type(self.settings[key]) == type(value))
 				self.settings[key] == value
@@ -236,21 +238,21 @@ class Game:
 				print(e)
 
 	def change_scoreboard_kills(self,shipname,value):
-		with self.lock:
+		with self._lock:
 			self.scoreboard_kills[shipname] += value
 
 	def change_scoreboard_clears(self,shipname,value):
-		with self.lock:
+		with self._lock:
 			self.scoreboard_clears[shipname] += value
 
 	def add_beachhead(self,x,y):
 		#there one beachhead may occure multiple times in this list. this results in a higher amount of enemies in that sector
-		with self.lock:
+		with self._lock:
 			return self.beachheads.append((x,y))
 
 	def remove_beachhead(self,x,y):
 		#removes the first occurence of the beachhead from the list.
-		with self.lock:
+		with self._lock:
 			if (x,y) in self.beachheads:
 				self.beachheads.remove((x,y))
 
@@ -264,7 +266,7 @@ class Game:
 		You may also alter the shipname here to avoid collisions.
 		You can return None, to forbid that client enters that setor now.
 		"""
-		with self.lock:
+		with self._lock:
 			if client in self.ships:
 				self.ships[client] = (shipname,-1,-1,0,0)	#invalidate, since client is not in a sector right now
 			if self.settings["Non Reentrant Sectors"]:
@@ -296,7 +298,7 @@ class Game:
 		This is called after an Artemis client sends an leave sector packet.
 		The client has defeated all enemies in that sector.
 		"""
-		with self.lock:
+		with self._lock:
 			assert client in self.ships
 			battle = self.ships[client]
 			x = battle[1]
@@ -315,7 +317,7 @@ class Game:
 		This is called after an Artemis client killed one or more enemies.
 		The client still resides in that sector.
 		"""
-		with self.lock:
+		with self._lock:
 			assert client in self.ships
 			battle = self.ships[client]
 			assert battle[0] == shipname
@@ -326,7 +328,7 @@ class Game:
 
 	def disconnect_client(self, client):
 		"""When a client disconects, free the sector"""
-		with self.lock:
+		with self._lock:
 			if client in self.ships:
 				self.ships[client] = (shipname,-1,-1,0,0)
 
@@ -338,24 +340,24 @@ class Game:
 		The caller mat provide an event to the engine, which is set when the map changes.
 		The caller must clear his event himself.
 		"""
-		self.notifications.append(event)
+		self._notifications.append(event)
 
 	def _map_changed(self):
 		"""Called to notify other modules that the map has changed"""
-		for e in self.notifications:
+		for e in self._notifications:
 			e.set()
 
 	def _next_turn(self):
 		"""proceeds to the next turn"""
-		with self.lock:
-			self.timer_thread.cancel()	#ignored if this is executed by the timer_thread itself
+		with self._lock:
+			self._timer_thread.cancel()	#ignored if this is executed by the timer_thread itself
 			self.turn["turn_started"] = time.time()
 			if self.turn["interlude"]:
 				if self.turn["turn_number"] <= self.turn["max_turns"]:
 					self.turn["interlude"] = False 
-					self.timer_thread = threading.Timer(self.settings["Minutes per Turn"]*60, self._next_turn)
+					self._timer_thread = threading.Timer(self.settings["Minutes per Turn"]*60, self._next_turn)
 				else:
-					self.timer_thread = threading.Timer(self.settings["Minutes between Turns (interlude)"]*60, self._next_turn)
+					self._timer_thread = threading.Timer(self.settings["Minutes between Turns (interlude)"]*60, self._next_turn)
 			else:
 				self._defeat_bases(self.map)
 				self._enemies_proceed(self.map)
@@ -364,8 +366,8 @@ class Game:
 					self.ships[client] = (self.ships[client][0],-1,-1,0,0)	#clear all the shipnames
 				self.turn["turn_number"] += 1
 				self.turn["interlude"] = True
-				self.timer_thread = threading.Timer(self.settings["Minutes between Turns (interlude)"]*60, self._next_turn)
-			self.timer_thread.start()
+				self._timer_thread = threading.Timer(self.settings["Minutes between Turns (interlude)"]*60, self._next_turn)
+			self._timer_thread.start()
 			self._map_changed()	#awakens notify thread. Turn over is sent.
 
 	def _defeat_bases(self,map):
@@ -375,7 +377,7 @@ class Game:
 		You may call this method with a copy of the games map,
 		so you can see what happens without modifying the actual map.
 		"""
-		with self.lock:
+		with self._lock:
 			for column in map:
 				for sector in column:
 					if sector["Enemies"] > 0:
@@ -390,7 +392,7 @@ class Game:
 		You may call this method with a copy of the games map,
 		so you can see what happens without modifying the actual map.
 		"""
-		with self.lock:
+		with self._lock:
 			enemies = self.settings["Invaders Per Turn"] // len(self.beachheads)
 			plus_one = self.settings["Invaders Per Turn"] % len(self.beachheads)
 			for x,y in self.beachheads:
@@ -407,7 +409,7 @@ class Game:
 		You may call this method with a copy of the games map,
 		so you can see what happens without modifying the actual map.
 		"""
-		with self.lock:
+		with self._lock:
 			for col in range(8):
 				for row in range(8):
 					sector = map[col][row]
@@ -435,6 +437,19 @@ class Game:
 		for x_1,y_1 in self.settings["Neighbours"]:
 			result.append((x_0+x_1, y_0+y_1))
 		return result
+
+
+	def __getstate__(self):
+		#picke calls this method when serializing the object
+		# Copy the object's state from self.__dict__ which contains
+		# all our instance attributes. Always use the dict.copy()
+		# method to avoid modifying the original state.
+		state = self.__dict__.copy()
+		# Remove the unpicklable entries.
+		for k in self.__dict__:
+			if k.startswith("_"):
+				del state[k]
+		return state
 
 #game=Game({})
 game=None

@@ -6,6 +6,7 @@ import engine
 
 import artemis_connector
 import pyro_connector
+import json_connector
 
 if __name__ == "__main__":
 	config = configparser.ConfigParser()
@@ -21,7 +22,8 @@ if __name__ == "__main__":
 	engine.game=engine.Game(config['server'])	
 	#engine.start_game=(config['original'])	
 	artemis_connector.start_server()
-	pyro_connector.start_pyro_server()
+	json_connector.test()	
+	#pyro_connector.start_pyro_server()
 #now start all the staff that needs an game object.
 
 
