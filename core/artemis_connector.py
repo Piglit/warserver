@@ -11,6 +11,7 @@ There are three instances for the communication with the artemis client:
 n Heartbeat-threads: each one sends a heartbeat package to his client every 0.5 seconds.
 """
 
+import copy
 import socketserver
 import threading
 import struct
@@ -90,31 +91,48 @@ def notify():
 	while True:
 		map_changed_event.wait(timeout=6)
 		map_changed_event.clear()
-		if engine.game.settings["Clients have own Maps"]:
-			pass
-		else:
-			#get map once
-			map = engine.game.get_map(client="All-Artemis-Clients")
-			assert len(map) == 8
-			unfinished_packages = []
-			turn_status = engine.game.get_turn_status(client="All-Artemis-Clients")
-			if turn_status["interlude"] != is_interlude:
-				#send turn over package
-				is_interlude = not is_interlude
-				unfinished_packages.append(compose_turn_over())
-			for i in range(8):
-				unfinished_packages.append(compose_map_col(i,map[i]))
-			unfinished_packages.append(compose_turn_status(turn_status))
-			unfinished_packages.append(compose_ships(engine.game.get_ships(client="All-Artemis-Clients")))
-		
-			with connections_lock:
-				for client in connections:
-					socket = connections[client]["socket"]
-					for package in unfinished_packages:
-						try:
-							socket.sendto(compose_data(client, package), client)
-						except Exception as e:
-							print(e)
+		#get whole map once
+		map = engine.game.get_map(client=("All-Artemis-Clients"))
+		assert len(map) == 8
+		orig_map_col = []
+		for i in range(8):
+			orig_map_col.append(compose_map_col(i,map[i]))
+		unfinished_packages = []
+		turn_status = engine.game.get_turn_status(client=("All-Artemis-Clients"))
+		if turn_status["interlude"] != is_interlude:
+			#send turn over package
+			is_interlude = not is_interlude
+			unfinished_packages.append(compose_turn_over())
+		unfinished_packages.append(compose_turn_status(turn_status))
+		unfinished_packages.append(compose_ships(engine.game.get_ships(client=("All-Artemis-Clients"))))
+	
+		with connections_lock:
+			for client in connections:
+				socket = connections[client]["socket"]
+				updates = engine.game.get_modified_map(client)
+				updated_cols = {}
+				for package in unfinished_packages:
+					try:
+						socket.sendto(compose_data(client, package), client)
+					except Exception as e:
+						print(e)
+				for x,y,k,v in sorted(updates):
+					if x not in updated_cols:
+						updated_cols[x] = copy.deepcopy(map[x])
+					if type(v) == int or type(v) == float:
+						updated_cols[x][y][k] += v
+					else:
+						updated_cols[x][y][k] = v
+
+				for i in range(8):
+					try:
+						if i in updated_cols:
+							socket.sendto(compose_data(client, compose_map_col(i,updated_cols[i])),client)
+						else:
+							socket.sendto(compose_data(client, orig_map_col[i]),client)
+					except Exception as e:
+						print(e)
+
 
 
 def register_connection(client, socket, connection_number):
@@ -145,7 +163,10 @@ def register_connection(client, socket, connection_number):
 
 def unregister_connection(client):
 	with connections_lock:
-		con = connections.pop(client)
+		if client in connections:
+			con = connections.pop(client)
+		else:
+			return
 	con["terminate"].set()
 
 def check_sector_replay(client,sector_number):
@@ -197,7 +218,7 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 					if package["subtype"] == "Sector-Enter":
 						sector = engine.game.enter_sector(package["X"],package["Y"],package["Ship-Name"],client)
 						if sector is not None:
-							if sector.get("Ship-Name") != package["Ship-Name"]:
+							if "Ship-Name" in sector and sector["Ship-Name"] != package["Ship-Name"]:
 								socket.sendto(compose_data(client, compose_shipname(sector["Ship-Name"])), client)
 								package["Ship-Name"] = sector["Ship-Name"]
 							socket.sendto(compose_data(client,compose_map_sector(sector)), client)

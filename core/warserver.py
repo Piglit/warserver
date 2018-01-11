@@ -16,14 +16,21 @@ if __name__ == "__main__":
 	#if throws an exception if files can not be found
 
 	config.read_file(args.config)
+	settings = {}
+	for key in config["int"]:
+		settings[key] = config["int"].getint(key)
+	for key in config["float"]:
+		settings[key] = config["float"].getfloat(key)
+	for key in config["bool"]:
+		settings[key] = config["bool"].getboolean(key)
 
 	print("This is the headless python Artemis warserver.")
 	print("Configuration loaded from file "+str(args.config.name))
-	engine.game=engine.Game(config['server'])	
+	engine.game=engine.Game(settings)	
 	#engine.start_game=(config['original'])	
 	artemis_connector.start_server()
-	json_connector.test()	
-	#pyro_connector.start_pyro_server()
+	#json_connector.test()	
+	pyro_connector.start_pyro_server()
 #now start all the staff that needs an game object.
 
 
