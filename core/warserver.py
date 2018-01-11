@@ -1,17 +1,19 @@
 #!/usr/bin/python3
 import configparser
 import argparse
+import pickle
 
 import engine
-
 import artemis_connector
 import pyro_connector
-import json_connector
+
+
 
 if __name__ == "__main__":
 	config = configparser.ConfigParser()
 	parser = argparse.ArgumentParser(description='Starts the Artemis WarServer.') 
 	parser.add_argument('--config', '-c', type=open, default='default.cfg', help='Load config file') 
+	parser.add_argument('--load', '-l', type=argparse.FileType("rb"), help='Load saved game') 
 	args = parser.parse_args()
 	#if throws an exception if files can not be found
 
@@ -24,10 +26,14 @@ if __name__ == "__main__":
 	for key in config["bool"]:
 		settings[key] = config["bool"].getboolean(key)
 
-	print("This is the headless python Artemis warserver.")
-	print("Configuration loaded from file "+str(args.config.name))
-	engine.game=engine.Game(settings)	
-	#engine.start_game=(config['original'])	
+	if args.load:
+		engine.game=pickle.load(args.load)
+		engine.game._start_from_loaded_game()
+	else:
+		print("This is the headless python Artemis warserver.")
+		print("Configuration loaded from file "+str(args.config.name))
+		engine.game=engine.Game(settings)	
+		#engine.start_game=(config['original'])	
 	artemis_connector.start_server()
 	#json_connector.test()	
 	pyro_connector.start_pyro_server()

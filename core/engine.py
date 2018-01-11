@@ -10,7 +10,8 @@ import random
 import copy
 from collections import Counter
 import Pyro4
-
+import pickle
+import os
 
 __author__ 	= "Pithlit"
 __version__	= 0.1
@@ -622,6 +623,14 @@ class Game:
 				if self.turn["turn_number"] <= self.turn["max_turns"]:
 					self.turn["interlude"] = False 
 					self._timer_thread = threading.Timer(self.settings["minutes per turn"]*60, self._next_turn)
+					#autosave
+					try:
+						directory = "AutosaveWarServer"
+						os.makedirs(directory, exist_ok=True)
+						with open(directory+"/_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(t))+"_turn_"+str(self.turn["turn_number"])+".sav","wb") as file:
+							pickle.dump(self, file)
+					except Exception as e:
+						print("autosave failed: "+str(e))
 				else:
 					self._timer_thread = threading.Timer(self.settings["minutes between turns (interlude)"]*60, self._next_turn)
 			else:
@@ -718,7 +727,6 @@ class Game:
 			result.append((x_0+x_1, y_0+y_1))
 		return result
 
-
 	def __getstate__(self):
 		#picke calls this method when serializing the object
 		# Copy the object's state from self.__dict__ which contains
@@ -731,51 +739,17 @@ class Game:
 				del state[k]
 		return state
 
-	def _get_meta_info(object, key, prefix, last_reference, meta_info):
-		""" this creates a metainfo dictionary, that can be provided to other clients
-			setter methods are created for each value of the game instance
-			the metainfo dict must be recreated, whenever some dict or list is newly assigned
-			call with self.__dict__
-			TODO: tuples
-		"""
-		if meta_info == None:
-			meta_info = {}
-		if prefix == None:
-			prefix = ''
-		if type(object) == int or type(object) == float:
-			meta_info[prefix] = {
-				"type": type(object),
-				"function":	functools.partial(self._change_info, last_reference, key),
-				"visible_to_all": str(key)[0].isupper() 
-			}
-		elif type(object) == str or type(object) == bool:
-			meta_info[prefix] = {
-				"type": type(object),
-				"function":	self._set_info,
-				"visible_to_all": str(key)[0].isupper() 
-			}
-		elif type(object) == list:
-			index = 0
-			for value in object:
-				newprefix = prefix+'.'+str(index)
-				index += 1
-				_get_meta_info(value, 'List', newprefix, object, meta_info)
-		elif type(object) == dict:
-			for okey in object:
-				if not okey.startswith('_'):
-					_get_meta_info(object[okey], okey, prefix+str(okey), object, meta_info)	
-
-	def change_info(object,key,value):
-		"""throws exception"""
-		with self._lock:
-			assert(type(object[key]) == type(value))
-			object[key] += value
-
-	def set_info(object,key,value):
-		"""throws exception"""
-		with self._lock:
-			assert(type(object[key]) == type(value))
-			object[key] = value
+	def _start_from_loaded_game(self):
+		self._lock = threading.RLock()
+		self._notifications = []
+		self._timer_thread = threading.Timer(self.settings["minutes per turn"]*60, self._next_turn)
+		t = time.time()
+		self.end_of_last_turn = t
+		self.turn["last_update"] = t
+		self.turn["turn_started"] = t
+		self._timer_thread.start()
+		self._map_changed()	#awakens notify thread. Turn over is sent.
+		print("Game Engine started")
 
 
 #game=Game({})
