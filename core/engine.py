@@ -120,6 +120,8 @@ class Game:
 			"interlude":	False,
 			"turn_started":	time.time(),
 			"last_update":	time.time(),
+			"remaining":	self.settings["minutes per turn"]*60,
+			"time_passed":	0.0,
 		}
 		del self.settings["total turns"]	#irrelevant from now on
 
@@ -215,7 +217,9 @@ class Game:
 		"Returns the turn dict with the seconds remaining as float"
 		with self._lock:
 			turn = self.turn
-			remaining = turn["turn_started"] - time.time()
+			t = time.time()
+			turn["time_passed"] = t - turn["turn_started"]
+			remaining = turn["turn_started"] - t
 			if turn["interlude"]:
 				remaining += self.settings["minutes between turns (interlude)"] * 60
 			else:
@@ -619,20 +623,15 @@ class Game:
 			self._timer_thread.cancel()	#ignored if this is executed by the timer_thread itself
 			t = time.time()
 			self.turn["turn_started"] = t
+			self.turn["time_passed"] = 0.0
 			if self.turn["interlude"]:
 				if self.turn["turn_number"] <= self.turn["max_turns"]:
 					self.turn["interlude"] = False 
-					self._timer_thread = threading.Timer(self.settings["minutes per turn"]*60, self._next_turn)
+					self.turn["remaining"] = self.settings["minutes per turn"]*60
 					#autosave
-					try:
-						directory = "AutosaveWarServer"
-						os.makedirs(directory, exist_ok=True)
-						with open(directory+"/_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(t))+"_turn_"+str(self.turn["turn_number"])+".sav","wb") as file:
-							pickle.dump(self, file)
-					except Exception as e:
-						print("autosave failed: "+str(e))
+					self._save_game("_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(t))+"_turn_"+str(self.turn["turn_number"])+".sav")
 				else:
-					self._timer_thread = threading.Timer(self.settings["minutes between turns (interlude)"]*60, self._next_turn)
+					self.turn["remaining"] = self.settings["minutes between turns (interlude)"]*60
 			else:
 				self._defeat_bases(self.map)
 				self._enemies_proceed(self.map)
@@ -642,9 +641,10 @@ class Game:
 					self.ships[client] = (self.ships[client][0],-1,-1,0,0)	#clear all the shipnames
 				self.turn["turn_number"] += 1
 				self.turn["interlude"] = True
-				self._timer_thread = threading.Timer(self.settings["minutes between turns (interlude)"]*60, self._next_turn)
-			self._timer_thread.start()
+				self.turn["remaining"] = self.settings["minutes between turns (interlude)"]*60
 			self.turn["last_update"] = t
+			self._timer_thread = threading.Timer(self.turn["remaining"], self._next_turn)
+			self._timer_thread.start()
 			self._map_changed()	#awakens notify thread. Turn over is sent.
 
 	def _defeat_bases(self,map):
@@ -728,25 +728,42 @@ class Game:
 		return result
 
 	def __getstate__(self):
-		#picke calls this method when serializing the object
-		# Copy the object's state from self.__dict__ which contains
-		# all our instance attributes. Always use the dict.copy()
-		# method to avoid modifying the original state.
-		state = self.__dict__.copy()
-		# Remove the unpicklable entries.
-		for k in self.__dict__:
-			if k.startswith("_"):
-				del state[k]
-		return state
+		with self._lock:
+			#picke calls this method when serializing the object
+			# Copy the object's state from self.__dict__ which contains
+			# all our instance attributes. Always use the dict.copy()
+			# method to avoid modifying the original state.
+			state = self.__dict__.copy()
+			# Remove the unpicklable entries.
+			for k in self.__dict__:
+				if k.startswith("_"):
+					del state[k]
+			return state
+
+	def _save_game(self, filename):
+		"""
+			Saves the game.
+			When calling manually, call get_turn_status before, to set remaining time correctly.
+			Otherwise the game time is set to the last call of get_turn_status from any client.
+		"""
+		with self._lock:
+			try:
+				directory = "SaveGamesWarServer"
+				filename = os.path.basename(filename)	#no directory traversal possible
+				os.makedirs(directory, exist_ok=True)
+				with open(directory+"/"+filename,"wb") as file:
+					pickle.dump(self, file)
+			except Exception as e:
+				print("save failed: "+str(e))
 
 	def _start_from_loaded_game(self):
 		self._lock = threading.RLock()
 		self._notifications = []
-		self._timer_thread = threading.Timer(self.settings["minutes per turn"]*60, self._next_turn)
+		self._timer_thread = threading.Timer(self.turn["remaining"], self._next_turn)
 		t = time.time()
 		self.end_of_last_turn = t
 		self.turn["last_update"] = t
-		self.turn["turn_started"] = t
+		self.turn["turn_started"] = t - self.turn["time_passed"]
 		self._timer_thread.start()
 		self._map_changed()	#awakens notify thread. Turn over is sent.
 		print("Game Engine started")

@@ -1,12 +1,8 @@
-try:
-	import Pyro4
-	pyro_avail = True
-except ImportError:
-	pyro_avail = False
-
 import threading
 import copy
 import time
+import Pyro4
+from Pyro4 import naming
 
 import engine
 
@@ -213,16 +209,29 @@ class GM(Observer):
 	def reset_fog(self):
 		engine.game.reset_fog()
 
-def start_pyro_server():
-	if pyro_avail:
-		daemon = Pyro4.Daemon()
-		uri = daemon.register(GM)
+	def save_game(self, filename):
+		engine.game.get_turn_status()
+		engine.game._save_game(filename)
+
+def start_pyro_server(host=None):
+	daemon = Pyro4.Daemon()
+	uri = daemon.register(GM)
+	try:
+		nameserver = Pyro4.locateNS(host=host)
+		nameserver.ping()
+		nameserver.register("warserver_game_master",uri)
+		print('Pyro server running. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+	except Pyro4.errors.NamingError:
+		print('No Pyro naming server found. Starting own Pyro naming server.')
 		try:
+			if host == None:
+				host = ""
+			threading.Thread(target=Pyro4.naming.startNSloop, kwargs={"host": host}).start()
+			#TODO check if this works for all clients in the network
 			nameserver = Pyro4.locateNS()
+			nameserver.ping()
 			nameserver.register("warserver_game_master",uri)
 			print('Pyro server running. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
 		except Pyro4.errors.NamingError:
-			print('Pyro server running. No Pyro name server found. Connect custom python clients from localhost with Pyro4.Proxy("'+str(uri)+'")')
-		threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls
-	else:
-		print('Pyro module not available. Install pyro if you want to use custom python clients or an interactive shell.')
+			print('Could not start Pyro naming server. Connect custom python clients from localhost with Pyro4.Proxy("'+str(uri)+'")')
+	threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls
