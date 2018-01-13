@@ -89,6 +89,12 @@ class Observer:
 	def get_base_points(self):
 		return copy.deepcopy(engine.game.get_base_points(client=self.role))
 
+	def get_events_get_map(self):
+		return copy.deepcopy(engine.game.get_events_get_map(client=self.role))
+
+	def get_events_enter_sector(self):
+		return copy.deepcopy(engine.game.get_events_enter_sector(client=self.role))
+
 	def get_nothing(self):
 		#just a ping
 		return
@@ -214,13 +220,13 @@ class GM(Observer):
 		engine.game._save_game(filename)
 
 def start_pyro_server(ip=None, host=None):
-	daemon = Pyro4.Daemon(host=host)
+	daemon = Pyro4.Daemon(host=ip)
 	uri = daemon.register(GM)
 	try:
-		nameserver = Pyro4.locateNS(host=ip)
+		nameserver = Pyro4.locateNS(host=host)
 		nameserver.ping()
 		nameserver.register("warserver_game_master",uri)
-		print('Pyro server running. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+		print('Pyro server running on '+str(ip)+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
 	except Pyro4.errors.NamingError:
 		print('No Pyro naming server found. Starting own Pyro naming server.')
 		try:
@@ -231,10 +237,10 @@ def start_pyro_server(ip=None, host=None):
 			nameserver = Pyro4.locateNS()
 			nameserver.ping()
 			nameserver.register("warserver_game_master",uri)
-			print('Pyro server running. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+			print('Pyro server running on '+str(ip)+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
 		except Pyro4.errors.NamingError:
 			print('Could not start Pyro naming server. Connect custom python clients from localhost with Pyro4.Proxy("'+str(uri)+'")')
 	if ip == None:
 		print("WARNING: option ip not given. Clients may not connect from other machines than yours. Try:")
-		print("python3 warserver.py --ip <your ip> 
+		print("python3 warserver.py --ip <your ip>")
 	threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls

@@ -246,7 +246,14 @@ class Game:
 	def get_beachheads(self, client=None):
 		with self._lock:
 			return self.beachheads
-		
+
+	def get_events_get_map(self, client=None):
+		with self._lock:
+			return self.events_get_map
+
+	def get_events_enter_sector(self, client=None):
+		with self._lock:
+			return self.events_enter_sector
 
 	#setter methods
 

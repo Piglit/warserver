@@ -39,7 +39,7 @@ if __name__ == "__main__":
 	artemis_connector.start_server()
 	#json_connector.test()	
 	print(80*'-')
-	pyro_connector.start_pyro_server(ip=ip, host=args.nameserver)
+	pyro_connector.start_pyro_server(ip=args.ip, host=args.nameserver)
 	print(80*'-')
 	print("You may start the admiral or game-master client on this or some other machine in your network.")
 
