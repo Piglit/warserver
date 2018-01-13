@@ -7,6 +7,9 @@ import threading
 import itertools
 import functools
 
+ROWS_OF_SHIPS_WINDOW = 4
+SCREEN_HEIGHT = 600 #replace with the height you want
+
 terrain_types = {
 	0:    "Empty",                   
 	1:    "Nebula",                   
@@ -20,7 +23,7 @@ terrain_types = {
 class Sector(TK.Frame):
 	sector_color = "yellow"
 	def __init__(self,parent,col,row):
-		self.size = min(root.winfo_screenwidth(),root.winfo_screenheight())/10
+		self.size = min(root.winfo_screenwidth(),SCREEN_HEIGHT)/10
 		TK.Frame.__init__(self,parent, width=self.size, height=self.size, borderwidth=1, relief="ridge")
 		self.grid_propagate(0)
 		self.grid(row=row, column=col, sticky="nsew")
@@ -55,10 +58,10 @@ class Sector(TK.Frame):
 		TK.Label(self, fg="#00fc00", textvariable=self["Ships"]).grid(row=2, column=0, columnspan=3, sticky="NW")
 		TK.Label(self, fg="white", text=self.coordinates).grid(row=3, column=0, sticky="SW")
 		self.bind("<1>", on_click_sector)
-		for child in sector_frame.children:
-			bindtags = list(self.children[child].bindtags())
+		for child in sector_frame.winfo_children():
+			bindtags = list(child.bindtags())
 			bindtags.insert(1, sector_frame)
-			self.children[child].bindtags(tuple(bindtags))
+			child.bindtags(tuple(bindtags))
 
 	def __getitem__(self, item):
 		return self.variables[item]	#raises key error
@@ -81,7 +84,7 @@ class Sector(TK.Frame):
 				self["Bases_short"].set("")
 			if sector["Enemies"] > 0:
 				self["Enemies_short"].set("Inv " + str(sector["Enemies"]))
-				self["Difficulty_short"].set("Diff " + str(sector["Difficulty_mod"]+state["settings"]["game difficulty level"]))
+				self["Difficulty_short"].set("D " + str(sector["Difficulty_mod"]+state["settings"]["game difficulty level"]))
 			else:
 				self["Enemies_short"].set("")
 				self["Difficulty_short"].set("")
@@ -162,13 +165,6 @@ print("Connecting to WarServer...")
 game = Pyro4.Proxy("PYRONAME:warserver_game_master")
 game.get_nothing()
 print("Connected.")
-#            "map":          
-#            "turn":         
-#            "ships":        
-#            "scoreboard":   
-#            "settings":     
-#            "beachheads":   
-#            "base_points":  
 
 state = {"last_update": -1.0}
 time_last_update = time.time()
@@ -202,16 +198,19 @@ def quit(event=None):
 
 root = TK.Tk()
 root.title("Admiral Screen")
-#root.geometry("{0}x{1}+0+0".format(root.winfo_screenwidth(), root.winfo_screenheight()))
+if SCREEN_HEIGHT == None:
+	SCREEN_HEIGHT = root.winfo_screenheight()
+#print(root.winfo_screenwidth())
+
 root.config(bg="black")
 status_variable = TK.StringVar()
 root.bind_all("<Key-q>", quit)
 
-#default_font = tkFont.nametofont("TkDefaultFont")
-#default_font.configure(size=48)
-#root.option_add("*Font", "Trebuchet")
-root.option_add("*Font", "Bierbaron")
-
+if SCREEN_HEIGHT >= 700:
+	#default_font = tkFont.nametofont("TkDefaultFont")
+	#default_font.configure(size=48)
+	#root.option_add("*Font", "Trebuchet")
+	root.option_add("*Font", "Bierbaron")
 
 #general layout
 root.rowconfigure(0, weight=0)
@@ -275,7 +274,7 @@ sector_frame.columnconfigure(1, weight=1)
 ship_cache = {}
 ship_columns = ["Ship name","Kills","Clears","Sector","Enemies","Ip","Port"]
 ttk.Style().configure("Treeview", background=ships_color, fieldbackground=ships_color, foreground=ship_text_color)
-ship_tree = ttk.Treeview(ships_frame, columns=ship_columns, displaycolumns=ship_columns, height=5, selectmode="none")
+ship_tree = ttk.Treeview(ships_frame, columns=ship_columns, displaycolumns=ship_columns, height=ROWS_OF_SHIPS_WINDOW, selectmode="none")
 ships_bar = TK.Scrollbar(ships_frame, command=ship_tree.yview)
 ship_tree.configure(yscrollcommand=ships_bar.set)
 

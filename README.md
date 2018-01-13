@@ -3,8 +3,8 @@ an inofficial reimplementation of the Artemis SBS Warserver.
 
 DEPENDENCIES
 python3
-pyro (python-pyro) 
-
+Pyro4 (python3-pyro4) 
+tkinter (python3-tk)
 
 USEAGE
 The WarServer is a python script that can be startes from console:
