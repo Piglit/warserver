@@ -212,14 +212,7 @@ if SCREEN_HEIGHT >= 700:
 	#root.option_add("*Font", "Trebuchet")
 	root.option_add("*Font", "Bierbaron")
 
-#general layout
-root.rowconfigure(0, weight=0)
-root.rowconfigure(1, weight=1)
-root.rowconfigure(2, weight=0)
-root.rowconfigure(3, weight=1)
-root.rowconfigure(4, weight=1)
-root.rowconfigure(5, weight=0)
-
+#colors
 turn_color="#000033"
 turn_text_color="cyan"
 map_color="black"
@@ -228,19 +221,35 @@ sector_text_color = "yellow"
 ships_color = "#000033"
 ship_text_color="yellow"
 
-turn_frame = TK.LabelFrame(root, text="Status", borderwidth=1, bg=turn_color, fg=turn_text_color)
-#base_point_frame = TK.Frame(root, borderwidth=1, bg="red")
-ships_frame = TK.Frame(root, borderwidth=0, bg="black")
-map_frame = TK.Frame(root, borderwidth=2, bg=map_color)
-sector_frame = TK.LabelFrame(root, text="Sector Information" ,borderwidth=1, bg=sector_color, fg="white")
-map_frame.grid			(row=0,column=0,rowspan=4,sticky="nsew")
-turn_frame.grid			(row=0,column=1,sticky="nsew")
-#base_point_frame.grid	(row=1,column=1,sticky="nsew")
-#padding
-sector_frame.grid		(row=2,column=1,sticky="nsew")
-#padding
-ships_frame.grid		(row=4,column=0,columnspan=2,sticky="nsew")
-TK.Label(root, textvariable=status_variable).grid(row=5,column=0,columnspan=2,sticky="wse")
+master_frame =	TK.PanedWindow(root, orient=TK.HORIZONTAL)
+master_frame.grid()
+
+
+
+
+#general layout
+map_frame = 	TK.Frame(master_frame, borderwidth=2, bg="black")
+info_frame = 	TK.Frame(master_frame)
+master_frame.add(map_frame)
+master_frame.add(info_frame)
+
+info_pane = 	TK.PanedWindow(info_frame, orient=TK.VERTICAL, bg="black")
+status_bar = 	TK.Label(info_frame, textvariable=status_variable)
+info_frame.rowconfigure(0,weight=1)
+info_pane.grid(row=0, sticky="nwse")
+status_bar.grid(row=1, sticky="wse")
+
+#info_pane layout
+turn_frame = 	TK.LabelFrame(info_pane, text="Status", borderwidth=1, bg=turn_color, fg=turn_text_color)
+ships_frame = 	TK.LabelFrame(info_pane, text="Ship Information", borderwidth=1, bg=ships_color, fg=turn_text_color)
+sector_frame = 	TK.LabelFrame(info_pane, text="Sector Information" ,borderwidth=1, bg=sector_color, fg="white")
+
+info_pane.add(turn_frame, minsize=100, sticky="nwe")
+info_pane.add(sector_frame, minsize=300)
+info_pane.add(ships_frame, minsize=100, sticky="nwse")
+#TODO better solution fpr minsize
+
+
 
 #turns
 time_remain = 0.0
