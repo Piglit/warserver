@@ -57,11 +57,12 @@ class Sector(TK.Frame):
 		TK.Label(self, fg="yellow", textvariable=self["Bases_short"]).grid(row=1, column=0, columnspan=2, sticky="NW")
 		TK.Label(self, fg="#00fc00", textvariable=self["Ships"]).grid(row=2, column=0, columnspan=3, sticky="NW")
 		TK.Label(self, fg="white", text=self.coordinates).grid(row=3, column=0, sticky="SW")
-		self.bind("<1>", on_click_sector)
-		for child in sector_frame.winfo_children():
+		self.bind("<1>", functools.partial(on_click_sector, self))
+		for child in self.winfo_children():
 			bindtags = list(child.bindtags())
-			bindtags.insert(1, sector_frame)
+			bindtags.insert(1, self)
 			child.bindtags(tuple(bindtags))
+
 
 	def __getitem__(self, item):
 		return self.variables[item]	#raises key error
@@ -173,11 +174,10 @@ force_update = threading.Event()
 terminate = False 
 
 
-def on_click_sector(event):
+def on_click_sector(sector, event):
 	global selected_sector
 	if selected_sector != None:
 		selected_sector.config(relief="ridge")
-	sector = event.widget
 	selected_sector = sector
 	selected_sector.config(relief="groove")
 	sector.draw_detailed_info(sector_frame)	
