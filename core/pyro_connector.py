@@ -160,7 +160,8 @@ class GM(Observer):
 		engine.game.change_turn_time_remaining(seconds)
 
 	def change_setting(self,setting,value):
-		#TODO typecheck and existence check
+		assert setting in engine.game.settings, str(setting)+" must be in game settings"
+		assert type(value) == type(engine.game.settings[setting]), "expected type "+str(type(engine.game.settings[setting]))+"got type" + str(type(value))
 		if type(value) == int or type(value) == float:
 			engine.game.change_setting(setting,value)
 		else:
