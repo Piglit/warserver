@@ -8,7 +8,6 @@ import itertools
 import functools
 
 ROWS_OF_SHIPS_WINDOW = 4
-SCREEN_HEIGHT = 600 #replace with the height you want
 
 terrain_types = {
 	0:    "Empty",                   
@@ -23,7 +22,10 @@ terrain_types = {
 class Sector(TK.Frame):
 	selected_sector = None
 	def __init__(self,parent,col,row):
-		self.size = min(root.winfo_screenwidth(),SCREEN_HEIGHT)/10
+		heur_height = root.maxsize()[1] - 2*(root.winfo_screenheight() - root.maxsize()[1])
+		#root maxsize is the maximum size of the window inclunding decorations, excluding tastbar
+		#try removing two times the size of the taskbar to get an approriate size
+		self.size = heur_height/8
 		TK.Frame.__init__(self,parent, width=self.size, height=self.size, borderwidth=1, relief="ridge")
 		self.grid_propagate(0)
 		self.grid(row=row, column=col, sticky="nsew")
@@ -291,15 +293,16 @@ def quit(event=None):
 
 root = TK.Tk()
 root.title("Admiral Screen")
-if SCREEN_HEIGHT == None:
-	SCREEN_HEIGHT = root.winfo_screenheight()
-#print(root.winfo_screenwidth())
 
 root.config(bg="black")
 status_variable = TK.StringVar()
 root.bind_all("<Key-q>", quit)
 
-if SCREEN_HEIGHT >= 700:
+root.rowconfigure(0, weight=1)
+root.columnconfigure(0, weight=1)
+
+
+if root.maxsize()[1] >= 700:
 	#default_font = tkFont.nametofont("TkDefaultFont")
 	#default_font.configure(size=48)
 	#root.option_add("*Font", "Trebuchet")
@@ -315,14 +318,19 @@ ships_color = "#000033"
 ship_text_color="yellow"
 
 master_frame =	TK.PanedWindow(root, orient=TK.HORIZONTAL)
-master_frame.grid()
-
+master_frame.grid(sticky="nwse")
+master_frame.columnconfigure(0, weight=1)
+master_frame.columnconfigure(1, weight=0)
 
 #general layout
 map_frame = 	TK.Frame(master_frame, borderwidth=2, bg="black")
-info_frame = 	TK.Frame(master_frame)
+info_frame = 	TK.Frame(master_frame, bg="black")
 master_frame.add(map_frame)
 master_frame.add(info_frame)
+
+for x in range(0,8):
+	map_frame.columnconfigure(x,weight=1)
+	map_frame.rowconfigure(x,weight=1)
 
 info_pane = 	TK.PanedWindow(info_frame, orient=TK.VERTICAL, bg="black")
 status_bar = 	TK.Label(info_frame, textvariable=status_variable)
@@ -380,7 +388,6 @@ score_frame.add_row("2")
 score_frame["2"]["Name"].set("USS KOENIG MELONIDAS II")
 score_frame.add_row(23)
 score_frame.set_row(23, Name="BlackmetalRegenbogenponyOfDOOM", Kills=23, Clears=None)
-
 
 #ships
 #ship_cache = {}
