@@ -21,7 +21,7 @@ terrain_types = {
 }
 
 class Sector(TK.Frame):
-	sector_color = "yellow"
+	selected_sector = None
 	def __init__(self,parent,col,row):
 		self.size = min(root.winfo_screenwidth(),SCREEN_HEIGHT)/10
 		TK.Frame.__init__(self,parent, width=self.size, height=self.size, borderwidth=1, relief="ridge")
@@ -57,7 +57,7 @@ class Sector(TK.Frame):
 		TK.Label(self, fg="yellow", textvariable=self["Bases_short"]).grid(row=1, column=0, columnspan=2, sticky="NW")
 		TK.Label(self, fg="#00fc00", textvariable=self["Ships"]).grid(row=2, column=0, columnspan=3, sticky="NW")
 		TK.Label(self, fg="white", text=self.coordinates).grid(row=3, column=0, sticky="SW")
-		self.bind("<1>", functools.partial(on_click_sector, self))
+		self.bind("<1>", self.on_click)
 		for child in self.winfo_children():
 			bindtags = list(child.bindtags())
 			bindtags.insert(1, self)
@@ -137,22 +137,14 @@ class Sector(TK.Frame):
 
 			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Coordinates:").grid(row=0, column=0, sticky="E")
 			TK.Label(parent, bg=self.color, fg=sector_text_color, text=self.coordinates).grid(row=0, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Invading Enemies:").grid(row=1, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Enemies"]).grid(row=1, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Alert Level:").grid(row=2, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Difficulty"]).grid(row=2, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Rear Bases:").grid(row=3, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Rear_Bases"]).grid(row=3, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Forward Bases:").grid(row=4, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Forward_Bases"]).grid(row=4, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Fire Bases:").grid(row=5, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Fire_Bases"]).grid(row=5, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Sector Name:").grid(row=6, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Name"]).grid(row=6, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Terrain:").grid(row=7, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Terrain_string"]).grid(row=7, column=1, sticky="W")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, text="Active Ships:").grid(row=8, column=0, sticky="E")
-			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Ships"], wraplength=240).grid(row=8, column=1, columnspan=3, sticky="W")
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Invading Enemies", textvariable=self["Enemies"], row=1)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Alert Level", textvariable=self["Difficulty"], row=2)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Rear Bases", textvariable=self["Rear_Bases"], row=3)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Forward Bases", textvariable=self["Forward_Bases"], row=4)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Fire Bases", textvariable=self["Fire_Bases"], row=5)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Sector Name", textvariable=self["Name"], row=6)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Terrain", textvariable=self["Terrain_string"], row=7)
+			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Active Ships", textvariable=self["Ships"], wraplength=240, row=8)
 			TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Beachhead_mark"]).grid(row=9, column=0, columnspan=2, sticky="WE")
 			TK.Button(parent, text="Place Rear Base (-1 Base Point)", command=functools.partial(self.place_base,1)).grid(row=10, column=0, columnspan=2, sticky="WE")
 			TK.Button(parent, text="Place Forward Base (-2 Base Point)", command=functools.partial(self.place_base,2)).grid(row=11, column=0, columnspan=2, sticky="WE")
@@ -161,6 +153,117 @@ class Sector(TK.Frame):
 	def place_base(self,base_type):
 		game.place_base(self.x,self.y,base_type)
 		force_update.set()
+
+	def on_click(self, event):
+		if Sector.selected_sector != None:
+			Sector.selected_sector.config(relief="ridge")
+		Sector.selected_sector = self
+		self.config(relief="groove")
+		self.draw_detailed_info(sector_frame)	
+
+class InfoFrame(TK.LabelFrame):
+	info_pane = None
+	def __init__(self, **kwargs):
+		TK.LabelFrame.__init__(self, InfoFrame.info_pane, borderwidth=1, **kwargs)
+
+	def show(self):
+		InfoFrame.info_pane.add(self)
+
+class TableFrame(InfoFrame):
+	def __init__(self, *args, **kwargs):
+		InfoFrame.__init__(self, *args, **kwargs)
+		self.headings = {}
+		self.items = {}
+
+	def set_column_headings(self, *headings, **kwargs):
+		self.headings = {}
+		self.items = {}
+		col = 0
+		for h in headings:
+			self.headings[h] = col
+			TK.Label(self, text=h, **kwargs).grid(row=0, column=col)
+			col += 1
+
+	def add_row(self, iid, **kwargs):
+		self.items[iid] = {}
+		col = 0
+		for h in self.headings:
+			self.items[iid][h] = TK.StringVar()
+			if "bg" not in kwargs and "background" not in kwargs:
+				kwargs["bg"] = self.config("bg")[4]
+			if "fg" not in kwargs and "foreground" not in kwargs:
+				kwargs["fg"] = self.config("fg")[4]
+			TK.Label(self, textvariable = self.items[iid][h], **kwargs).grid(row=len(self.items), column=col)
+			col += 1
+
+	def set_variable(self, iid, heading, value):
+		self.items[iid][heading].set(value)
+
+	def get_variable(self, iid, heading):
+		return self.items[iid][heading].get()
+	
+	def __getitem__(self, iid):
+		return self.items[iid]
+	
+	def set_row(self, iid, **kwargs):
+		for k in kwargs:
+			self.set_variable(iid, k, kwargs[k])
+
+class VariableLabel(TK.StringVar):
+	def __init__(self, parent, row=None, text=None, textvariable=None, **kwargs):
+		#TODO calculate row automatically
+		TK.StringVar.__init__(self)
+		if "bg" not in kwargs and "background" not in kwargs:
+			kwargs["bg"] = parent.config("bg")[4]
+		if "fg" not in kwargs and "foreground" not in kwargs:
+			kwargs["fg"] = parent.config("fg")[4]
+		self.titlelable = TK.Label(parent, text=text+":", **kwargs)
+		self.varlable   = TK.Label(parent, textvariable=textvariable or self, **kwargs)
+		self.titlelable.grid(row=row, column=0, sticky="E")
+		self.varlable.grid	(row=row, column=1, sticky="W")
+
+
+class Clock(TK.StringVar):
+	#class is not threadsave
+	_countdowns = []
+
+	def __init__(self, countdown=True):
+		TK.StringVar.__init__(self)
+		self.countdown = countdown 
+		if countdown:
+			self.seconds = 0
+			Clock._countdowns.append(self)	#not threadsave
+
+	def set(self, seconds):
+		"""accepts evert type, StringVar accepts. only float gets converted and counted down"""
+		if type(seconds) == float:
+			if self.countdown:
+				self.seconds = seconds
+			prefix=""
+			if seconds < 0:
+				seconds = -seconds
+				prefix = "-"
+			if seconds > 3600:
+				seconds = time.strftime(prefix+"%H:%M:%S",time.gmtime(seconds))
+			else:
+				seconds = time.strftime(prefix+"%M:%S",time.gmtime(seconds))
+		else:
+			print("Warning: setting clock object not to float!")
+		TK.StringVar.set(self, seconds)
+		
+	def decrease(self, dt):
+		self.seconds -= dt
+		self.set(self.seconds)
+	
+	def quick_update():
+		global time_updated_clock
+		while not terminate:
+			time.sleep(0.1)
+			now = time.time()
+			time_diff = now - time_updated_clock
+			time_updated_clock = now
+			for clock in Clock._countdowns:
+				clock.decrease(time_diff)
 
 print("Connecting to WarServer...")
 game = Pyro4.Proxy("PYRONAME:warserver_game_master")
@@ -172,16 +275,6 @@ time_last_update = time.time()
 selected_sector = None
 force_update = threading.Event()
 terminate = False 
-
-
-def on_click_sector(sector, event):
-	global selected_sector
-	if selected_sector != None:
-		selected_sector.config(relief="ridge")
-	selected_sector = sector
-	selected_sector.config(relief="groove")
-	sector.draw_detailed_info(sector_frame)	
-#	root.update_idletasks()
 
 def quit(event=None):
 	global terminate
@@ -225,8 +318,6 @@ master_frame =	TK.PanedWindow(root, orient=TK.HORIZONTAL)
 master_frame.grid()
 
 
-
-
 #general layout
 map_frame = 	TK.Frame(master_frame, borderwidth=2, bg="black")
 info_frame = 	TK.Frame(master_frame)
@@ -240,67 +331,79 @@ info_pane.grid(row=0, sticky="nwse")
 status_bar.grid(row=1, sticky="wse")
 
 #info_pane layout
-turn_frame = 	TK.LabelFrame(info_pane, text="Status", borderwidth=1, bg=turn_color, fg=turn_text_color)
-ships_frame = 	TK.LabelFrame(info_pane, text="Ship Information", borderwidth=1, bg=ships_color, fg=turn_text_color)
-sector_frame = 	TK.LabelFrame(info_pane, text="Sector Information" ,borderwidth=1, bg=sector_color, fg="white")
+InfoFrame.info_pane = info_pane
+turn_frame = 	InfoFrame(text="Status", bg=turn_color, fg=turn_text_color)
+score_frame = 	TableFrame(text="Ship Information", bg=ships_color, fg=turn_text_color)
+ships_frame = 	InfoFrame(text="Ship Information", bg=ships_color, fg=turn_text_color)
+sector_frame = 	InfoFrame(text="Sector Information", bg=sector_color, fg="white")
 
 info_pane.add(turn_frame, minsize=100, sticky="nwe")
 info_pane.add(sector_frame, minsize=300)
-info_pane.add(ships_frame, minsize=100, sticky="nwse")
+#info_pane.add(ships_frame, minsize=100, sticky="nwse")
 #TODO better solution fpr minsize
-
 
 
 #turns
 time_remain = 0.0
 time_war = 0.0
 time_updated_clock = 0.0
+
 turn_string = TK.StringVar()
-turn_numbers = TK.StringVar()
-turn_time = TK.StringVar()
-turn_max_time = TK.StringVar()
-turn_war_time = TK.StringVar()
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_string).grid(row=0, column=0, sticky="E")
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_numbers).grid(row=0, column=1, columnspan=2, sticky="W")
+turn_numbers = 	VariableLabel(turn_frame, text="Turn", row=0)
+turn_time = 	Clock() 
+turn_max_time = Clock(countdown=False) 
+turn_war_time = Clock()
+
 TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, text="Time").grid(row=1, column=0,sticky="E")
 TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_time).grid(row=1,column=1,sticky="W")
 TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_max_time).grid(row=1,column=2,sticky="W")
 TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, text="Remaining War Time").grid(row=2, column=0,sticky="E")
 TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_war_time).grid(row=2, column=1,columnspan=2,sticky="W")
+TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_string).grid(row=3, column=0, sticky="E")
 
 #base points
-base_points = TK.StringVar() 
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, text="Base Points").grid(row=3,column=0, sticky="E")
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=base_points).grid(row=3,column=1, sticky="W")
+base_points = VariableLabel(turn_frame, row=4, text="Base Points")
 
 #sector frame
 TK.Label(sector_frame, bg=sector_color, fg=sector_text_color, text="Click on a sector to scan it").grid(row=0, column=0,sticky="W")
 sector_frame.columnconfigure(0, weight=0)
 sector_frame.columnconfigure(1, weight=1)
 
+#scoreboard
+score_frame.show()
+score_frame.set_column_headings("Name","Kills","Clears", bg=ships_color, fg="white")
+score_frame.add_row("123", fg="cyan")
+score_frame.set_variable("123", "Name", "Tesselmis")
+score_frame.set_variable("123", "Kills", 3)
+score_frame.set_variable("123", "Clears", 4)
+score_frame.add_row("2")
+score_frame["2"]["Name"].set("USS KOENIG MELONIDAS II")
+score_frame.add_row(23)
+score_frame.set_row(23, Name="BlackmetalRegenbogenponyOfDOOM", Kills=23, Clears=None)
+
 
 #ships
-ship_cache = {}
-ship_columns = ["Ship name","Kills","Clears","Sector","Enemies","Ip","Port"]
-ttk.Style().configure("Treeview", background=ships_color, fieldbackground=ships_color, foreground=ship_text_color)
-ship_tree = ttk.Treeview(ships_frame, columns=ship_columns, displaycolumns=ship_columns, height=ROWS_OF_SHIPS_WINDOW, selectmode="none")
-ships_bar = TK.Scrollbar(ships_frame, command=ship_tree.yview)
-ship_tree.configure(yscrollcommand=ships_bar.set)
-
-ship_tree.grid(row=0,column=0, sticky="NWSE")
-ships_bar.grid(row=0,column=1, sticky="NWSE")
-
-for c in ship_columns:
-	ship_tree.column(c,stretch=True)
-	ship_tree.heading(c,text=c)
-ship_tree.column("Ship name",width=240)
-ship_tree.column("Kills",width=60)
-ship_tree.column("Clears",width=60)
-ship_tree.column("Sector",width=60)
-ship_tree.column("Enemies",width=60)
-ship_tree.column("Ip",width=120)
-ship_tree.column("Port",width=60)
-ship_tree.column('#0',stretch=False,width=0,minwidth=0)
+#ship_cache = {}
+#ship_columns = ["Ship name","Kills","Clears","Sector","Enemies","Ip","Port"]
+#ttk.Style().configure("Treeview", background=ships_color, fieldbackground=ships_color, foreground=ship_text_color)
+#ship_tree = ttk.Treeview(ships_frame, columns=ship_columns, displaycolumns=ship_columns, height=ROWS_OF_SHIPS_WINDOW, selectmode="none")
+#ships_bar = TK.Scrollbar(ships_frame, command=ship_tree.yview)
+#ship_tree.configure(yscrollcommand=ships_bar.set)
+#
+#ship_tree.grid(row=0,column=0, sticky="NWSE")
+#ships_bar.grid(row=0,column=1, sticky="NWSE")
+#
+#for c in ship_columns:
+#	ship_tree.column(c,stretch=True)
+#	ship_tree.heading(c,text=c)
+#ship_tree.column("Ship name",width=240)
+#ship_tree.column("Kills",width=60)
+#ship_tree.column("Clears",width=60)
+#ship_tree.column("Sector",width=60)
+#ship_tree.column("Enemies",width=60)
+#ship_tree.column("Ip",width=120)
+#ship_tree.column("Port",width=60)
+#ship_tree.column('#0',stretch=False,width=0,minwidth=0)
 
 #map
 map_data = []
@@ -312,7 +415,6 @@ for col in range(0,8):
 
 def update():
 	global time_remain
-	global time_war
 	global time_updated_clock
 	global terminate
 	while not terminate:
@@ -341,16 +443,15 @@ def update():
 			else:
 				turn_string.set("Turn")
 				maxtime = state["settings"]["minutes per turn"]*60
-			turn_max_time.set(" / "+time.strftime("%M:%S",time.gmtime(maxtime)))
+			turn_max_time.set(maxtime)
 			time_remain = state["turn"]["remaining"]-time_latency
 			time_updated_clock = time.time()
-			turn_time.set(time.strftime("%M:%S", time.gmtime(time_remain)))
+			turn_time.set(time_remain)
 			time_war = (state["turn"]["max_turns"] - state["turn"]["turn_number"]) * (state["settings"]["minutes per turn"] + state["settings"]["minutes between turns (interlude)"])*60
 			if state["turn"]["interlude"]:
 				time_war += state["settings"]["minutes per turn"]*60
 			time_war += time_remain  
-			turn_war_time.set(time.strftime("%H:%M:%S", time.gmtime(time_war)))
-			
+			turn_war_time.set(time_war)
 
 		if "base_points" in updates:
 			base_points.set(str(state["base_points"]))
@@ -407,34 +508,11 @@ def update():
 			y = sector["y"]
 			state["map"][x][y].update(sector)
 			map_data[x][y].update(sector)
-#		try:
-#			root.update()	#i dont use update_idletasks, because update refreshes everything. This is needed, when the window was not visible and is again.
-#		except Exception:
-#			print("Terminating")
-#			break
-			
-
-def quick_update():
-	global time_remain
-	global time_war
-	global time_updated_clock
-	while not terminate:
-		time.sleep(0.1)
-		now = time.time()
-		time_remain -= now - time_updated_clock 
-		time_war -= now - time_updated_clock
-		time_updated_clock = now
-		turn_time.set(time.strftime("%M:%S", time.gmtime(time_remain)))
-		turn_war_time.set(time.strftime("%H:%M:%S", time.gmtime(time_war)))
-#		try:
-#			root.update_idletasks()
-#		except RuntimeError:
-#			break
 
 print("Starting interface")
 
 try:
-	quick_thread = threading.Thread(target=quick_update)
+	quick_thread = threading.Thread(target=Clock.quick_update)
 	update_thread = threading.Thread(target=update)
 	force_update.set()
 	quick_thread.start()
