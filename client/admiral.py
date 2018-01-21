@@ -20,16 +20,37 @@ terrain_types = {
 	6:    "Crossroads",               
 }
 
-class Sector(TK.Frame):
+class InfoFrame(TK.LabelFrame):
+	info_pane = None
+	def __init__(self, **kwargs):
+		TK.LabelFrame.__init__(self, InfoFrame.info_pane, borderwidth=1, **kwargs)
+
+	def show(self, sticky="nwes", **kwargs):
+		InfoFrame.info_pane.add(self,sticky=sticky, **kwargs)
+
+
+class Sector:
+	"""
+		repesents one game Sector.
+		Each sector has two frames:
+			a) the map frame, where the most important stats are shown
+			b) the detail frame, where all information can be seen
+		When the user clicks on the map frame, the detail frame will be shown
+		In the detail frame are buttons, to place bases.
+	"""
 	selected_sector = None
-	def __init__(self,parent,col,row):
-		heur_height = root.maxsize()[1] - 2*(root.winfo_screenheight() - root.maxsize()[1])
-		#root maxsize is the maximum size of the window inclunding decorations, excluding tastbar
-		#try removing two times the size of the taskbar to get an approriate size
-		self.size = heur_height/8
-		TK.Frame.__init__(self,parent, width=self.size, height=self.size, borderwidth=1, relief="ridge")
-		self.grid_propagate(0)
-		self.grid(row=row, column=col, sticky="nsew")
+
+	def configure_class(map_frame, info_pane, map_size=None):
+		Sector.map_frame = map_frame
+		Sector.info_pane = info_pane
+		if map_size!= None:
+			Sector.map_sector_size = map_size/8
+		else:
+			#root maxsize is the maximum size of the window inclunding decorations, excluding tastbar
+			#try removing two times the size of the taskbar to get an approriate size
+			Sector.map_sector_size = (root.maxsize()[1] - 2*(root.winfo_screenheight() - root.maxsize()[1])) /8
+
+	def __init__(self,col,row):
 		self.x=col
 		self.y=row
 		self.hidden = False
@@ -49,53 +70,16 @@ class Sector(TK.Frame):
 			"Difficulty_short":	TK.StringVar(),
 			"Bases_short":	TK.StringVar(),
 		}
-		self.columnconfigure(0,weight=1)
-		self.columnconfigure(1,weight=1)
-		self.columnconfigure(2,weight=1)
-		self.rowconfigure(0,weight=1)
-		self.rowconfigure(1,weight=1)
-		self.rowconfigure(2,weight=1)
-		self.rowconfigure(3,weight=1)
-		TK.Label(self, fg="red", textvariable=self["Enemies_short"]).grid(row=0, column=0, sticky="NW")
-		TK.Label(self, fg="red", textvariable=self["Difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
-		TK.Label(self, fg="yellow", textvariable=self["Bases_short"]).grid(row=1, column=0, columnspan=2, sticky="NW")
-		TK.Label(self, fg="#00fc00", textvariable=self["Ships"]).grid(row=2, column=0, columnspan=3, sticky="NW")
-		TK.Label(self, fg="white", textvariable=self["Coordinates"]).grid(row=3, column=0, sticky="SW")
-		self.bind("<1>", self.on_click)
-		for child in self.winfo_children():
-			bindtags = list(child.bindtags())
-			bindtags.insert(1, self)
-			child.bindtags(tuple(bindtags))
-		
-		self.detail_frame = InfoFrame(bg=self.color, fg="white", text="Sector Information")
+		self.map_frame = SectorMapFrame(self)
+		self.info_frame = SectorInfoFrame(self)
 
-
-		self.detail_frame.columnconfigure(0, weight=0)
-		self.detail_frame.columnconfigure(1, weight=1)
-		info_pane.add(self.detail_frame, hide=True)
-		parent = self.detail_frame
-		self.detail_variables=[
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Coordinates", textvariable=self["Coordinates"], row=0),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Invading Enemies", textvariable=self["Enemies"], row=1),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Alert Level", textvariable=self["Difficulty"], row=2),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Rear Bases", textvariable=self["Rear_Bases"], row=3),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Forward Bases", textvariable=self["Forward_Bases"], row=4),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Fire Bases", textvariable=self["Fire_Bases"], row=5),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Sector Name", textvariable=self["Name"], row=6),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Terrain", textvariable=self["Terrain_string"], row=7),
-			VariableLabel(parent, bg=self.color, fg=sector_text_color, text="Active Ships", textvariable=self["Ships"], wraplength=240, row=8),
-		]
-		self.bh_label = TK.Label(parent, bg=self.color, fg=sector_text_color, textvariable=self["Beachhead_mark"])
-		self.bh_label.grid(row=9, column=0, columnspan=2, sticky="WE")
-		TK.Button(parent, text="Place Rear Base (-1 Base Point)", command=functools.partial(self.place_base,1)).grid(row=10, column=0, columnspan=2, sticky="WE")
-		TK.Button(parent, text="Place Forward Base (-2 Base Point)", command=functools.partial(self.place_base,2)).grid(row=11, column=0, columnspan=2, sticky="WE")
-		TK.Button(parent, text="Place Fire Base (-3 Base Point)", command=functools.partial(self.place_base,3)).grid(row=12, column=0, columnspan=2, sticky="WE")
 
 	def __getitem__(self, item):
 		return self.variables[item]	#raises key error
 		
 	def update(self, sector):
 		self.hidden = sector["Hidden"]
+		self.fog = sector["fog"]
 		if not self.hidden:
 			for key in self.variables:
 				if key in sector:
@@ -133,12 +117,13 @@ class Sector(TK.Frame):
 			color="#330000"	
 		else:
 			color="#333300"	
-			
-		self.config(bg=color)	
+		self.set_color(color)
+		
+	def set_color(self,color):
 		self.color = color
-		for child in self.winfo_children():
-			child.config(bg=color)
-
+		self.map_frame.set_color(color)
+		self.info_frame.set_color(color)
+		
 	def reset_ships(self):
 		self.variables["Ships"].set("")
 		self.update(state["map"][self.x][self.y])
@@ -150,10 +135,7 @@ class Sector(TK.Frame):
 		else:
 			self.variables["Ships"].set(old+", "+name)
 		color = "#000033"
-		self.config(bg=color)	
-		self.color = color
-		for child in self.winfo_children():
-			child.config(bg=color)
+		self.set_color(color)
 
 	def place_base(self,base_type):
 		game.place_base(self.x,self.y,base_type)
@@ -161,28 +143,82 @@ class Sector(TK.Frame):
 
 	def on_click(self, event):
 		if Sector.selected_sector != None:
-			Sector.selected_sector.config(relief="ridge")
-			info_pane.paneconfig(Sector.selected_sector.detail_frame, hide=True)
+			Sector.selected_sector.map_frame.config(relief="ridge")
+			Sector.info_pane.paneconfig(Sector.selected_sector.info_frame, hide=True)
 		Sector.selected_sector = self
-		self.config(relief="groove")
-		self.detail_frame.config(bg=self.color)
-		self.bh_label.config(bg=self.color)
-		for var in self.detail_variables:
-			var.config(bg=self.color) 
+		self.map_frame.config(relief="groove")
+		self.info_frame.set_color(self.color)
 		if not self.hidden:
-			info_pane.paneconfig(self.detail_frame, hide=False, height=self.detail_frame.winfo_reqheight())
+			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight())
+		elif self.fog:
+			#foggy
+			pass
+
 		else:
+			#empty
 			#TK.Label(sector_frame, bg=sector_color, fg=sector_text_color, text="Click on a sector to scan it").grid(row=0, column=0,sticky="W")
 			pass
 
+class SectorMapFrame(TK.Frame):
+	"""This is a sector on the map frame, owned by a Sector object"""
+	def __init__(self, sector):
+		TK.Frame.__init__(self, Sector.map_frame, width=Sector.map_sector_size, height=Sector.map_sector_size, borderwidth=1, relief="ridge")
+		self.grid_propagate(0)
+		self.grid(row=row, column=col, sticky="nsew")
+		self.columnconfigure(0,weight=1)
+		self.columnconfigure(1,weight=1)
+		self.columnconfigure(2,weight=1)
+		self.rowconfigure(0,weight=1)
+		self.rowconfigure(1,weight=1)
+		self.rowconfigure(2,weight=1)
+		self.rowconfigure(3,weight=1)
 
-class InfoFrame(TK.LabelFrame):
-	info_pane = None
-	def __init__(self, **kwargs):
-		TK.LabelFrame.__init__(self, InfoFrame.info_pane, borderwidth=1, **kwargs)
+		TK.Label(self, fg="red", 	textvariable=sector["Enemies_short"]).grid	(row=0, column=0, sticky="NW")
+		TK.Label(self, fg="red", 	textvariable=sector["Difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
+		TK.Label(self, fg="yellow", textvariable=sector["Bases_short"]).grid	(row=1, column=0, columnspan=2, sticky="NW")
+		TK.Label(self, fg="#00fc00",textvariable=sector["Ships"]).grid			(row=2, column=0, columnspan=3, sticky="NW")
+		TK.Label(self, fg="white", 	textvariable=sector["Coordinates"]).grid	(row=3, column=0, sticky="SW")
+		self.bind("<1>", sector.on_click)
+		for child in self.winfo_children():
+			bindtags = list(child.bindtags())
+			bindtags.insert(1, self)
+			child.bindtags(tuple(bindtags))
 
-	def show(self, sticky="nwes", **kwargs):
-		InfoFrame.info_pane.add(self,sticky=sticky, **kwargs)
+	def set_color(self,color):
+		self.config(bg=color)	
+		for child in self.winfo_children():
+			child.config(bg=color)
+
+class SectorInfoFrame(InfoFrame):
+	"""This is a sectors detail frame, owned by a Sector object"""
+	
+	def __init__(self, sector):	
+		InfoFrame.__init__(self, fg="white", text="Sector Information")
+		self.columnconfigure(0, weight=0)
+		self.columnconfigure(1, weight=1)
+		self.detail_variables=[
+			VariableLabel(self, fg=sector_text_color, text="Coordinates", 		textvariable=sector["Coordinates"], 	row=0),
+			VariableLabel(self, fg=sector_text_color, text="Invading Enemies", 	textvariable=sector["Enemies"], 		row=1),
+			VariableLabel(self, fg=sector_text_color, text="Alert Level", 		textvariable=sector["Difficulty"], 	row=2),
+			VariableLabel(self, fg=sector_text_color, text="Rear Bases", 		textvariable=sector["Rear_Bases"], 	row=3),
+			VariableLabel(self, fg=sector_text_color, text="Forward Bases", 	textvariable=sector["Forward_Bases"], row=4),
+			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["Fire_Bases"], 	row=5),
+			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["Name"], 			row=6),
+			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["Terrain_string"], row=7),
+			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["Ships"], 		wraplength=240, row=8),
+		]
+		self.bh_label = TK.Label(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"])
+		self.bh_label.grid(row=9, column=0, columnspan=2, sticky="WE")
+		TK.Button(self, text="Place Rear Base (-1 Base Point)", 	command=functools.partial(sector.place_base,1)).grid(row=10, column=0, columnspan=2, sticky="WE")
+		TK.Button(self, text="Place Forward Base (-2 Base Point)", 	command=functools.partial(sector.place_base,2)).grid(row=11, column=0, columnspan=2, sticky="WE")
+		TK.Button(self, text="Place Fire Base (-3 Base Point)", 	command=functools.partial(sector.place_base,3)).grid(row=12, column=0, columnspan=2, sticky="WE")
+		Sector.info_pane.add(self, hide=True)
+
+	def set_color(self,color):
+		self.config(bg=color)	
+		for child in self.winfo_children():
+			if not isinstance(child, TK.Button):
+				child.config(bg=color)
 
 class TableFrame(InfoFrame):
 	def __init__(self, *args, **kwargs):
@@ -428,13 +464,14 @@ base_points = VariableLabel(turn_frame, row=4, text="Base Points")
 
 
 #map
+Sector.configure_class(map_frame, info_pane)
 map_data = []
 for col in range(0,8):
 	map_data.append([])
 	map_frame.columnconfigure(col,weight=1)
 	map_frame.rowconfigure(col,weight=1)
 	for row in range(0,8):
-		map_data[col].append(Sector(map_frame, col, row))
+		map_data[col].append(Sector(col, row))
 
 
 #scoreboard
