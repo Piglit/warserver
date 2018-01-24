@@ -8,7 +8,9 @@ import itertools
 import functools
 import string
 
-ROWS_OF_SHIPS_WINDOW = 4
+#ideas:
+#sector map frames get focus by mouseover, change relief
+#buttons get grey when not enough bps 
 
 terrain_types = {
 	0:    "Empty",                   
@@ -19,6 +21,25 @@ terrain_types = {
 	5:    "Wildlands",                
 	6:    "Crossroads",               
 }
+
+
+PRIVILEGE_LEVEL = "admiral"
+privilege_flags = {	#binary flags!
+	"gm-admiral":	3,
+	"gm":		2,
+	"admiral":	1,
+	"observer":	0,
+}
+
+#colors
+turn_color="#000033"
+turn_text_color="cyan"
+map_color="black"
+sector_color = "#000033" #only at beginning, later from sectors
+sector_text_color = "yellow"
+ships_color = "#000033"
+ship_text_color="yellow"
+
 
 class InfoFrame(TK.LabelFrame):
 	info_pane = None
@@ -38,8 +59,6 @@ class Sector:
 		When the user clicks on the map frame, the detail frame will be shown
 		In the detail frame are buttons, to place bases.
 	"""
-	selected_sector = None
-
 	def configure_class(map_frame, info_pane, map_size=None):
 		Sector.map_frame = map_frame
 		Sector.info_pane = info_pane
@@ -49,6 +68,23 @@ class Sector:
 			#root maxsize is the maximum size of the window inclunding decorations, excluding tastbar
 			#try removing two times the size of the taskbar to get an approriate size
 			Sector.map_sector_size = (root.maxsize()[1] - 2*(root.winfo_screenheight() - root.maxsize()[1])) /8
+		Sector.selected_sector = None
+		Sector.empty_sector = InfoFrame(fg="white", bg="black", text="Sector Information")
+		TK.Label(Sector.empty_sector, fg=sector_text_color, bg="black",text="Empty sector selected.").grid(row=0, sticky="nw")
+#		TK.Label(Sector.empty_sector, fg=sector_text_color, bg="black",text="Empty sectors can not be entered.").grid(row=1, sticky="nw")
+		Sector.empty_sector.show(hide=True)
+		Sector.foggy_sector = InfoFrame(fg="white", bg="grey", text="Sector Information")
+		TK.Label(Sector.foggy_sector, fg=sector_text_color, bg="grey",text="Unknown sector selected.").grid(row=0, sticky="nw")
+#		TK.Label(Sector.foggy_sector, fg=sector_text_color, bg="grey",text="Conquer a adjacent sector.").grid(row=1, sticky="nw")
+		Sector.foggy_sector.show(hide=True)
+
+		Sector.default_sector = InfoFrame(fg="white", bg="black", text="Sector Information")
+		meassure = TK.Label(Sector.default_sector, fg=sector_text_color, bg="black",text=25*"W") #not shown
+		Sector.info_pane.desired_width = meassure.winfo_reqwidth()
+		TK.Label(Sector.default_sector, fg=sector_text_color, bg="black",text="Click on a sector to show detailed info.").grid(row=0, sticky="nw")
+		Sector.default_sector.show(width=Sector.info_pane.desired_width)
+
+		print(Sector.info_pane.desired_width)
 
 	def __init__(self,col,row):
 		self.x=col
@@ -145,19 +181,18 @@ class Sector:
 		if Sector.selected_sector != None:
 			Sector.selected_sector.map_frame.config(relief="ridge")
 			Sector.info_pane.paneconfig(Sector.selected_sector.info_frame, hide=True)
+		Sector.default_sector.show(hide=True)
+		Sector.empty_sector.show(hide=True)
+		Sector.foggy_sector.show(hide=True)
 		Sector.selected_sector = self
 		self.map_frame.config(relief="groove")
 		self.info_frame.set_color(self.color)
 		if not self.hidden:
-			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight())
+			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 		elif self.fog:
-			#foggy
-			pass
-
+			Sector.info_pane.paneconfig(Sector.foggy_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 		else:
-			#empty
-			#TK.Label(sector_frame, bg=sector_color, fg=sector_text_color, text="Click on a sector to scan it").grid(row=0, column=0,sticky="W")
-			pass
+			Sector.info_pane.paneconfig(Sector.empty_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -252,7 +287,13 @@ class TableFrame(InfoFrame):
 
 	def get_variable(self, iid, heading):
 		return self.items[iid][heading].get()
-	
+
+	def __contains__(self, iid):
+		return iid in self.items
+
+	def __iter__(self):
+		return self.items.__iter__()
+
 	def __getitem__(self, iid):
 		return self.items[iid]
 	
@@ -291,16 +332,17 @@ class CatStringVariable(TK.StringVar):
 		self.variables = []
 		values = []
 		for var in variables:
-			if isinstance(var, TK.StringVar):
-				self.variables.append(var)
-				values.append(var.get())
-				print(var.get())
-			else:
-				self.variables.append(TK.StringVar(var))
-				values.append(str(var))
+			if not isinstance(var, TK.StringVar):
+				var = TK.StringVar(value = var)
+			self.variables.append(var)
+			values.append(var.get())
+			var.trace(self, self.trace_callback)
 		TK.StringVar.__init__(self)
 		TK.StringVar.set(self, self.formatstring.format(*values))
 		print(self.formatstring.format(*values))
+
+	def trace_callback():
+		pass
 
 	def set(self, formatstring=None, *values):
 		if formatstring != None:
@@ -311,6 +353,7 @@ class CatStringVariable(TK.StringVar):
 			self.variables[i].set(values[i])
 		TK.StringVar.set(self, self.formatstring.format(*values))
 		print(self.formatstring.format(*values))
+		#TODO call trace callbacks?
 
 	def get(self):
 		values = []
@@ -351,7 +394,10 @@ class Clock(TK.StringVar):
 	def decrease(self, dt):
 		self.seconds -= dt
 		self.set(self.seconds)
-	
+
+	def increase(self, dt):
+		self.decrease(-dt)
+
 	def quick_update():
 		global time_updated_clock
 		while not terminate:
@@ -361,6 +407,83 @@ class Clock(TK.StringVar):
 			time_updated_clock = now
 			for clock in Clock._countdowns:
 				clock.decrease(time_diff)
+
+
+class ModifiableLabel(TK.Frame):
+	def __init__(self, parent, textvariable=None, backend_setter=None, needed_privilege_level="gm", **kwargs):
+		TK.Frame__init__(self, parent, **kwargs)
+		self.modifiable = privilege_flags[needed_privilege_level] & privilege_flags[PRIVILEGE_LEVEL]
+		#TODO test^	
+		self.textvariable = textvariable
+		self.backend_setter = backend_setter
+		self.label = TK.Label(self, textvariable=textvariable, **kwargs)
+		self.label.grid(row=1, sticky="we")
+
+class IncreasableLabel(ModifiableLabel):
+	def __init__(self, *args, **kwargs):
+		ModifiableLabel.__init__(self,*args,**kwargs)
+		if self.modifiable:
+			self.downframe = TK.Frame(self, **kwargs)
+			self.upframe = TK.Frame(self, **kwargs)
+			self.downframe.grid(row=2, sticky="we")
+			self.upframe.grid(row=0, sticky="we")
+			self.buttoncolmns = 0
+			self._reset_buttons(float(self.textvariable.get()))
+
+	def _reset_buttons(self, value):
+		if isinstance(self.textvariable, Clock):
+			if len(value) <= 2 and self.buttoncolmns != 2:
+				buttoncolmns = 2
+			elif len(value) <= 5 and self.buttoncolmns != 4:
+				buttoncolmns = 4
+			else:
+				buttoncolmns = 5
+			if self.buttoncolmns != buttoncolmns:
+				self.buttoncolmns = buttoncolmns
+				for child in self.upframe.winfo_children():
+					child.destroy()
+				for child in self.downframe.winfo_children():
+					child.destroy()
+				multiplier = 1
+				for i in range(0, buttoncolmns):
+					#TODO add placeholder for : in display
+					TK.Button(self.upframe, 	command=functools.partial(self._inc, multiplier)).grid(column=buttoncolmns-1-i, row=0, sticky="we")
+					TK.Button(self.downframe, 	command=functools.partial(self._dec, multiplier)).grid(column=1, row=buttoncolmns-1-i, sticky="we")
+					if i%2 == 0:
+						multiplier *= 10
+					else:
+						multiplier *= 6
+		else:
+			if value > 19 and self.buttoncolmns != 2:
+				self.buttoncolmns = 2
+				for child in self.upframe.winfo_children():
+					child.destroy()
+				for child in self.downframe.winfo_children():
+					child.destroy()
+				TK.Button(self.upframe, 	command=functools.partial(self._inc, 1)).grid(column=1, row=0, sticky="we")
+				TK.Button(self.downframe, 	command=functools.partial(self._dec, 1)).grid(column=1, row=0, sticky="we")
+				TK.Button(self.upframe, 	command=functools.partial(self._inc, 10)).grid(column=0, row=0, sticky="we")
+				TK.Button(self.downframe, 	command=functools.partial(self._dec, 10)).grid(column=0, row=0, sticky="we")
+			elif value < 10 and self.buttoncolmns != 1:
+				self.buttoncolmns = 1
+				for child in self.upframe.winfo_children():
+					child.destroy()
+				for child in self.downframe.winfo_children():
+					child.destroy()
+				TK.Button(self.upframe, 	command=functools.partial(self._inc, 1)).grid(column=0, row=0, sticky="we")
+				TK.Button(self.downframe, 	command=functools.partial(self._dec, 1)).grid(column=0, row=0, sticky="we")
+				self.lastvalue = value
+
+	def _inc(self, delta):
+		#not threadsave
+		value = float(self.textvariable.get()) + delta
+#		self.textvariable.set(value)	#make it visible, variable will be set correctly at next udate (FIXME or not if remote set fails!)
+		self.backend_setter(delta)	#does not call force update
+		#Better less responsive then faulty behaviour
+		self._reset_buttons(value)
+
+	def _dec(self, delta):
+		self._inc(-delta)
 
 print("Connecting to WarServer...")
 game = Pyro4.Proxy("PYRONAME:warserver_game_master")
@@ -376,15 +499,8 @@ terminate = False
 def quit(event=None):
 	global terminate
 	terminate = True
-	#force_update.set()
 	root.destroy()
 	print("Terminating")
-	#quick_thread.join(timeout=1.0)
-	#update_thread.join(timeout=3.0)
-	#print("Quit")
-	#root.quit()
-	#exit()
-
 
 root = TK.Tk()
 root.title("Admiral Screen")
@@ -403,25 +519,16 @@ if root.maxsize()[1] >= 700:
 	#root.option_add("*Font", "Trebuchet")
 	root.option_add("*Font", "Bierbaron")
 
-#colors
-turn_color="#000033"
-turn_text_color="cyan"
-map_color="black"
-sector_color = "#000033" #only at beginning, later from sectors
-sector_text_color = "yellow"
-ships_color = "#000033"
-ship_text_color="yellow"
-
 master_frame =	TK.PanedWindow(root, orient=TK.HORIZONTAL)
 master_frame.grid(sticky="nwse")
 master_frame.columnconfigure(0, weight=1)
-master_frame.columnconfigure(1, weight=0)
+master_frame.columnconfigure(1, weight=1)
 
 #general layout
 map_frame = 	TK.Frame(master_frame, borderwidth=2, bg="black")
 info_frame = 	TK.Frame(master_frame, bg="black")
 master_frame.add(map_frame)
-master_frame.add(info_frame)
+master_frame.add(info_frame, sticky="nwse")
 
 
 
@@ -435,7 +542,7 @@ status_bar.grid(row=1, sticky="wse")
 InfoFrame.info_pane = info_pane
 turn_frame = 	InfoFrame(text="Status", bg=turn_color, fg=turn_text_color)
 score_frame = 	TableFrame(text="Ship Information", bg=ships_color, fg=turn_text_color)
-ships_frame = 	InfoFrame(text="Ship Information", bg=ships_color, fg=turn_text_color)
+tech_frame = 	TableFrame(text="Connected Clients", bg=ships_color, fg=turn_text_color)
 
 
 turn_frame.show()
@@ -463,6 +570,7 @@ base_points = VariableLabel(turn_frame, row=4, text="Base Points")
 
 
 
+
 #map
 Sector.configure_class(map_frame, info_pane)
 map_data = []
@@ -477,38 +585,10 @@ for col in range(0,8):
 #scoreboard
 score_frame.show()
 score_frame.set_column_headings("Name","Kills","Clears", bg=ships_color, fg="white")
-score_frame.add_row("123", fg="cyan")
-score_frame.set_variable("123", "Name", "Tesselmis")
-score_frame.set_variable("123", "Kills", 3)
-score_frame.set_variable("123", "Clears", 4)
-score_frame.add_row("2")
-score_frame["2"]["Name"].set("USS KOENIG MELONIDAS II")
-score_frame.add_row(23)
-score_frame.set_row(23, Name="BlackmetalRegenbogenponyOfDOOM", Kills=23, Clears=None)
 
-#ships
-#ship_cache = {}
-#ship_columns = ["Ship name","Kills","Clears","Sector","Enemies","Ip","Port"]
-#ttk.Style().configure("Treeview", background=ships_color, fieldbackground=ships_color, foreground=ship_text_color)
-#ship_tree = ttk.Treeview(ships_frame, columns=ship_columns, displaycolumns=ship_columns, height=ROWS_OF_SHIPS_WINDOW, selectmode="none")
-#ships_bar = TK.Scrollbar(ships_frame, command=ship_tree.yview)
-#ship_tree.configure(yscrollcommand=ships_bar.set)
-#
-#ship_tree.grid(row=0,column=0, sticky="NWSE")
-#ships_bar.grid(row=0,column=1, sticky="NWSE")
-#
-#for c in ship_columns:
-#	ship_tree.column(c,stretch=True)
-#	ship_tree.heading(c,text=c)
-#ship_tree.column("Ship name",width=240)
-#ship_tree.column("Kills",width=60)
-#ship_tree.column("Clears",width=60)
-#ship_tree.column("Sector",width=60)
-#ship_tree.column("Enemies",width=60)
-#ship_tree.column("Ip",width=120)
-#ship_tree.column("Port",width=60)
-#ship_tree.column('#0',stretch=False,width=0,minwidth=0)
-
+#techboard
+tech_frame.show()
+tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
 
 def update():
 	global time_remain
@@ -553,8 +633,7 @@ def update():
 		if "base_points" in updates:
 			base_points.set(str(state["base_points"]))
 
-		if "ships" in updates or "scoreboard" in updates:
-			ship_cache = {}
+		if "ships" in updates:
 			for x in range(0,8):
 				for y in range(0,8):
 					map_data[x][y].reset_ships()
@@ -566,30 +645,22 @@ def update():
 					map_data[x][y].add_ship(name)
 				else:	
 					sector = None
-				if name not in ship_cache:
-					ship_cache[name] = {}
-				ship_cache[name]["ip"] = ip	
-				ship_cache[name]["port"] = port	
-				ship_cache[name]["x"] = x	
-				ship_cache[name]["y"] = y
-				ship_cache[name]["enemies"] = enemies
-				ship_cache[name]["sector"] = sector
-			for name in state["scoreboard"][0]:
-				if name not in ship_cache:
-					ship_cache[name] = {}
-				ship_cache[name]["clears"] = state["scoreboard"][0].get(name)
-			for name in state["scoreboard"][1]:
-				if name not in ship_cache:
-					ship_cache[name] = {}
-				ship_cache[name]["kills"] = state["scoreboard"][1].get(name)
-			for name in ship_cache:
-				s = ship_cache[name]
-				ship_tuple = (name,s.get("kills"),s.get("clears"),s.get("sector"),s.get("enemies"),s.get("ip"),s.get("port"))
-				if not ship_tree.exists(name):
-					ship_tree.insert("", 0, iid=name, values=ship_tuple)
-				else:
-					ship_tree.item(name, values=ship_tuple)
 
+				if k not in tech_frame:
+					tech_frame.add_row(k, fg="cyan")
+				tech_frame.set_row(k, Name=name, Address=str(ip))#+":"+str(port))
+
+			for k in tech_frame:
+				if k not in state["ships"]:
+					tech_frame.remove_row(k)
+			info_pane.paneconfig(tech_frame, height=tech_frame.winfo_reqheight())
+
+		if "scoreboard" in updates:
+			for name in state["scoreboard"][1]:
+				if name not in score_frame:
+					score_frame.add_row(name, fg="cyan")
+				score_frame.set_row(name, Name=name, Kills=state["scoreboard"][1][name], Clears=state["scoreboard"][0].get(name))
+			info_pane.paneconfig(score_frame, height=score_frame.winfo_reqheight())
 
 		if "sectors" in updates:
 			map_iterator = updates["sectors"]
