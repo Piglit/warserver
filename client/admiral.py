@@ -31,6 +31,9 @@ privilege_flags = {	#binary flags!
 	"observer":	0,
 }
 
+def allow_privilege(level):
+	return privilege_flags[PRIVILEGE_LEVEL] & privilege_flags[level]
+
 #colors
 turn_color="#000033"
 turn_text_color="cyan"
@@ -39,17 +42,48 @@ sector_color = "#000033" #only at beginning, later from sectors
 sector_text_color = "yellow"
 ships_color = "#000033"
 ship_text_color="yellow"
-
+caption_color="white"
 
 class InfoFrame(TK.LabelFrame):
 	info_pane = None
-	def __init__(self, **kwargs):
-		TK.LabelFrame.__init__(self, InfoFrame.info_pane, borderwidth=1, **kwargs)
+	def __init__(self, fg=None, captionfg=caption_color, **kwargs):
+		TK.LabelFrame.__init__(self, InfoFrame.info_pane, fg=captionfg, borderwidth=1, **kwargs)
+		self.fg=fg
 
 	def show(self, sticky="nwes", **kwargs):
 		InfoFrame.info_pane.add(self,sticky=sticky, **kwargs)
 
+class VariableLabel(TK.StringVar):
+	def __init__(self, parent, row=None, text=None, textvariable=None, hidden=False, **kwargs):
+		TK.StringVar.__init__(self)
+		if "bg" not in kwargs and "background" not in kwargs:
+			kwargs["bg"] = parent.config("bg")[4]
+		if "fg" not in kwargs and "foreground" not in kwargs:
+			if parent.fg is not None:
+				kwargs["fg"] = parent.fg
+			else:
+				kwargs["fg"] = parent.config("fg")[4]
+		if text:
+			self.titlelable = TK.Label(parent, text=text+":", **kwargs)
+		else:
+			self.titlelable = None
+		self.varlable   = TK.Label(parent, textvariable=textvariable or self, **kwargs)
+		self.parent = parent
+		self.hidden = hidden
+		self.row = row or self.parent.grid_size()[1] 
+		if not hidden:
+			self.show()
 
+	def config(self, **kwargs):
+		if self.titlelable:
+			self.titlelable.config(**kwargs)
+		self.varlable.config(**kwargs)
+
+	def show(self):
+		if self.titlelable != None:
+			self.titlelable.grid(row=self.row, column=0, sticky="E")
+		self.varlable.grid	(row=self.row, column=1, sticky="W")
+	
 class Sector:
 	"""
 		repesents one game Sector.
@@ -84,8 +118,6 @@ class Sector:
 		TK.Label(Sector.default_sector, fg=sector_text_color, bg="black",text="Click on a sector to show detailed info.").grid(row=0, sticky="nw")
 		Sector.default_sector.show(width=Sector.info_pane.desired_width)
 
-		print(Sector.info_pane.desired_width)
-
 	def __init__(self,col,row):
 		self.x=col
 		self.y=row
@@ -116,7 +148,7 @@ class Sector:
 	def update(self, sector):
 		self.hidden = sector["Hidden"]
 		self.fog = sector["fog"]
-		if not self.hidden:
+		if not self.hidden or self.fog:	#TODO improve this in engine!
 			for key in self.variables:
 				if key in sector:
 					self.variables[key].set(sector[key])
@@ -190,7 +222,11 @@ class Sector:
 		if not self.hidden:
 			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 		elif self.fog:
-			Sector.info_pane.paneconfig(Sector.foggy_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
+			if allow_privilege("gm"):
+				Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
+			else:
+				Sector.info_pane.paneconfig(Sector.foggy_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
+
 		else:
 			Sector.info_pane.paneconfig(Sector.empty_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 
@@ -207,7 +243,7 @@ class SectorMapFrame(TK.Frame):
 		self.rowconfigure(1,weight=1)
 		self.rowconfigure(2,weight=1)
 		self.rowconfigure(3,weight=1)
-
+		#TODO fix hiding by fog
 		TK.Label(self, fg="red", 	textvariable=sector["Enemies_short"]).grid	(row=0, column=0, sticky="NW")
 		TK.Label(self, fg="red", 	textvariable=sector["Difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
 		TK.Label(self, fg="yellow", textvariable=sector["Bases_short"]).grid	(row=1, column=0, columnspan=2, sticky="NW")
@@ -232,18 +268,19 @@ class SectorInfoFrame(InfoFrame):
 		self.columnconfigure(0, weight=0)
 		self.columnconfigure(1, weight=1)
 		self.detail_variables=[
-			VariableLabel(self, fg=sector_text_color, text="Coordinates", 		textvariable=sector["Coordinates"], 	row=0),
-			VariableLabel(self, fg=sector_text_color, text="Invading Enemies", 	textvariable=sector["Enemies"], 		row=1),
-			VariableLabel(self, fg=sector_text_color, text="Alert Level", 		textvariable=sector["Difficulty"], 	row=2),
-			VariableLabel(self, fg=sector_text_color, text="Rear Bases", 		textvariable=sector["Rear_Bases"], 	row=3),
-			VariableLabel(self, fg=sector_text_color, text="Forward Bases", 	textvariable=sector["Forward_Bases"], row=4),
-			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["Fire_Bases"], 	row=5),
-			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["Name"], 			row=6),
-			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["Terrain_string"], row=7),
-			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["Ships"], 		wraplength=240, row=8),
+			VariableLabel(self, fg=sector_text_color, text="Coordinates", 		textvariable=sector["Coordinates"], 	),
+			VariableLabel(self, fg=sector_text_color, text="Invading Enemies", 	textvariable=sector["Enemies"], 		),
+			VariableLabel(self, fg=sector_text_color, text="Alert Level", 		textvariable=sector["Difficulty"], 		),
+			VariableLabel(self, fg=sector_text_color, text="Rear Bases", 		textvariable=sector["Rear_Bases"], 	),
+			VariableLabel(self, fg=sector_text_color, text="Forward Bases", 	textvariable=sector["Forward_Bases"], ),
+			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["Fire_Bases"], 	),
+			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["Name"], 			),
+			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["Terrain_string"], ),
+			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["Ships"], 		wraplength=240, ),
+			VariableLabel(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"]),
 		]
-		self.bh_label = TK.Label(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"])
-		self.bh_label.grid(row=9, column=0, columnspan=2, sticky="WE")
+		#self.bh_label = TK.Label(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"])
+		#self.bh_label.grid(row=9, column=0, columnspan=2, sticky="WE")
 		TK.Button(self, text="Place Rear Base (-1 Base Point)", 	command=functools.partial(sector.place_base,1)).grid(row=10, column=0, columnspan=2, sticky="WE")
 		TK.Button(self, text="Place Forward Base (-2 Base Point)", 	command=functools.partial(sector.place_base,2)).grid(row=11, column=0, columnspan=2, sticky="WE")
 		TK.Button(self, text="Place Fire Base (-3 Base Point)", 	command=functools.partial(sector.place_base,3)).grid(row=12, column=0, columnspan=2, sticky="WE")
@@ -301,67 +338,7 @@ class TableFrame(InfoFrame):
 		for k in kwargs:
 			self.set_variable(iid, k, kwargs[k])
 
-class VariableLabel(TK.StringVar):
-	def __init__(self, parent, row=None, text=None, textvariable=None, hidden=False, **kwargs):
-		#TODO calculate row automatically
-		TK.StringVar.__init__(self)
-		if "bg" not in kwargs and "background" not in kwargs:
-			kwargs["bg"] = parent.config("bg")[4]
-		if "fg" not in kwargs and "foreground" not in kwargs:
-			kwargs["fg"] = parent.config("fg")[4]
-		self.titlelable = TK.Label(parent, text=text+":", **kwargs)
-		self.varlable   = TK.Label(parent, textvariable=textvariable or self, **kwargs)
-		self.hidden = hidden
-		self.row = row
-		if not hidden:
-			self.show()
-
-	def config(self, **kwargs):
-		self.titlelable.config(**kwargs)
-		self.varlable.config(**kwargs)
-
-	def show(self):
-		self.titlelable.grid(row=self.row, column=0, sticky="E")
-		self.varlable.grid	(row=self.row, column=1, sticky="W")
-		
-
-
-class CatStringVariable(TK.StringVar):
-	def __init__(self, formatstring, *variables):
-		self.formatstring = formatstring
-		self.variables = []
-		values = []
-		for var in variables:
-			if not isinstance(var, TK.StringVar):
-				var = TK.StringVar(value = var)
-			self.variables.append(var)
-			values.append(var.get())
-			var.trace(self, self.trace_callback)
-		TK.StringVar.__init__(self)
-		TK.StringVar.set(self, self.formatstring.format(*values))
-		print(self.formatstring.format(*values))
-
-	def trace_callback():
-		pass
-
-	def set(self, formatstring=None, *values):
-		if formatstring != None:
-			self.formatstring = formatstring
-		assert len(values) == len(self.variables)
-		for i in range(0, len(self.variables)):
-			print(values[i])
-			self.variables[i].set(values[i])
-		TK.StringVar.set(self, self.formatstring.format(*values))
-		print(self.formatstring.format(*values))
-		#TODO call trace callbacks?
-
-	def get(self):
-		values = []
-		for var in self.variables:
-			values.append(var.get())
-		TK.StringVar.set(self, self.formatstring.format(*values))
-		return self.formatstring.format(*values)
-		print(self.formatstring.format(*values))
+	
 
 class Clock(TK.StringVar):
 	#class is not threadsave
@@ -553,20 +530,17 @@ time_remain = 0.0
 time_updated_clock = 0.0
 
 turn_string = TK.StringVar()
-turn_numbers = 	VariableLabel(turn_frame, text="Turn", row=0)
+turn_numbers = 	VariableLabel(turn_frame, text="Turn")
 turn_time = 	Clock() 
 turn_max_time = Clock(countdown=False) 
 turn_war_time = Clock()
 
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, text="Time").grid(row=1, column=0, sticky="E") 
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_time).grid(row=1, column=1, sticky="W")
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_max_time).grid(row=1,column=2,sticky="W")
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, text="Remaining War Time").grid(row=2, column=0,sticky="E")
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_war_time).grid(row=2, column=1,columnspan=2,sticky="W")
-TK.Label(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_string).grid(row=3, column=0, sticky="E")
+VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, text="Remaining Turn Time", textvariable=turn_time)
+VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, text="Remaining War Time", textvariable=turn_war_time)
+VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_string)
 
 #base points
-base_points = VariableLabel(turn_frame, row=4, text="Base Points")
+base_points = VariableLabel(turn_frame, text="Base Points")
 
 
 
