@@ -24,6 +24,7 @@ terrain_types = {
 
 
 PRIVILEGE_LEVEL = "admiral"
+#PRIVILEGE_LEVEL = "gm"
 privilege_flags = {	#binary flags!
 	"gm-admiral":	3,
 	"gm":		2,
@@ -108,7 +109,7 @@ class Sector:
 #		TK.Label(Sector.empty_sector, fg=sector_text_color, bg="black",text="Empty sectors can not be entered.").grid(row=1, sticky="nw")
 		Sector.empty_sector.show(hide=True)
 		Sector.foggy_sector = InfoFrame(fg="white", bg="grey", text="Sector Information")
-		TK.Label(Sector.foggy_sector, fg=sector_text_color, bg="grey",text="Unknown sector selected.").grid(row=0, sticky="nw")
+		TK.Label(Sector.foggy_sector, fg=sector_text_color, bg="grey",text="Unexplored sector selected.").grid(row=0, sticky="nw")
 #		TK.Label(Sector.foggy_sector, fg=sector_text_color, bg="grey",text="Conquer a adjacent sector.").grid(row=1, sticky="nw")
 		Sector.foggy_sector.show(hide=True)
 
@@ -147,8 +148,8 @@ class Sector:
 		
 	def update(self, sector):
 		self.hidden = sector["Hidden"]
-		self.fog = sector["fog"]
-		if not self.hidden or self.fog:	#TODO improve this in engine!
+		self.fog = sector["fog"] and not allow_privilege("gm")
+		if not self.hidden:	
 			for key in self.variables:
 				if key in sector:
 					self.variables[key].set(sector[key])
@@ -158,11 +159,11 @@ class Sector:
 				self["Beachhead_mark"].set("Invasion Beachhead")
 			else:
 				self["Beachhead_mark"].set("")
-			if sector["Rear_Bases"] + sector["Forward_Bases"] + sector["Fire_Bases"] > 0:
+			if sector["Rear_Bases"] + sector["Forward_Bases"] + sector["Fire_Bases"] > 0 and not self.fog:
 				self["Bases_short"].set(str(sector["Rear_Bases"])+"/"+str(sector["Forward_Bases"])+"/"+str(sector["Fire_Bases"]))
 			else:
 				self["Bases_short"].set("")
-			if sector["Enemies"] > 0:
+			if sector["Enemies"] > 0 and not self.fog:
 				self["Enemies_short"].set("Inv " + str(sector["Enemies"]))
 				self["Difficulty_short"].set("D " + str(sector["Difficulty_mod"]+state["settings"]["game difficulty level"]))
 			else:
@@ -174,11 +175,10 @@ class Sector:
 		color = ""	
 		if self.variables["Ships"].get() != "":
 			color = "#000033"
+		elif sector["fog"]:
+			color="grey"
 		elif sector["Hidden"]:
-			if sector["fog"]:
-				color="grey"
-			else:
-				color="black"
+			color="black"
 		elif sector["Enemies"] <= 0:
 			color="#003300"
 		elif sector["Rear_Bases"] + sector["Forward_Bases"] + sector["Fire_Bases"] > 0:
@@ -219,16 +219,13 @@ class Sector:
 		Sector.selected_sector = self
 		self.map_frame.config(relief="groove")
 		self.info_frame.set_color(self.color)
-		if not self.hidden:
-			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
-		elif self.fog:
-			if allow_privilege("gm"):
-				Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
-			else:
-				Sector.info_pane.paneconfig(Sector.foggy_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
-
-		else:
+		if self.fog and not allow_privilege("gm"):
+			Sector.info_pane.paneconfig(Sector.foggy_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
+		elif self.hidden: 
 			Sector.info_pane.paneconfig(Sector.empty_sector, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
+		else:
+			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
+
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -243,7 +240,6 @@ class SectorMapFrame(TK.Frame):
 		self.rowconfigure(1,weight=1)
 		self.rowconfigure(2,weight=1)
 		self.rowconfigure(3,weight=1)
-		#TODO fix hiding by fog
 		TK.Label(self, fg="red", 	textvariable=sector["Enemies_short"]).grid	(row=0, column=0, sticky="NW")
 		TK.Label(self, fg="red", 	textvariable=sector["Difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
 		TK.Label(self, fg="yellow", textvariable=sector["Bases_short"]).grid	(row=1, column=0, columnspan=2, sticky="NW")
@@ -259,7 +255,7 @@ class SectorMapFrame(TK.Frame):
 		self.config(bg=color)	
 		for child in self.winfo_children():
 			child.config(bg=color)
-
+			
 class SectorInfoFrame(InfoFrame):
 	"""This is a sectors detail frame, owned by a Sector object"""
 	
@@ -561,8 +557,9 @@ score_frame.show()
 score_frame.set_column_headings("Name","Kills","Clears", bg=ships_color, fg="white")
 
 #techboard
-tech_frame.show()
-tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
+if allow_privilege("gm"):
+	tech_frame.show()
+	tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
 
 def update():
 	global time_remain
@@ -592,7 +589,7 @@ def update():
 				turn_string.set("Interlude")
 				maxtime = state["settings"]["minutes between turns (interlude)"]*60
 			else:
-				turn_string.set("Turn")
+				turn_string.set("")
 				maxtime = state["settings"]["minutes per turn"]*60
 			turn_max_time.set(maxtime)
 			time_remain = state["turn"]["remaining"]-time_latency
@@ -619,7 +616,6 @@ def update():
 					map_data[x][y].add_ship(name)
 				else:	
 					sector = None
-
 				if k not in tech_frame:
 					tech_frame.add_row(k, fg="cyan")
 				tech_frame.set_row(k, Name=name, Address=str(ip))#+":"+str(port))
@@ -627,7 +623,8 @@ def update():
 			for k in tech_frame:
 				if k not in state["ships"]:
 					tech_frame.remove_row(k)
-			info_pane.paneconfig(tech_frame, height=tech_frame.winfo_reqheight())
+			if allow_privilege("gm"):
+				info_pane.paneconfig(tech_frame, height=tech_frame.winfo_reqheight())
 
 		if "scoreboard" in updates:
 			for name in state["scoreboard"][1]:
