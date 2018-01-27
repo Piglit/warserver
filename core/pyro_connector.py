@@ -227,7 +227,7 @@ def start_pyro_server(ip=None, host=None):
 		nameserver = Pyro4.locateNS(host=host)
 		nameserver.ping()
 		nameserver.register("warserver_game_master",uri)
-		print('Pyro server running on '+str(ip)+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+		print('Pyro server running on '+str(ip or "localhost")+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
 	except Pyro4.errors.NamingError:
 		print('No Pyro naming server found. Starting own Pyro naming server.')
 		try:
@@ -238,7 +238,7 @@ def start_pyro_server(ip=None, host=None):
 			nameserver = Pyro4.locateNS()
 			nameserver.ping()
 			nameserver.register("warserver_game_master",uri)
-			print('Pyro server running on '+str(ip)+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+			print('Pyro server running on '+str(ip or "localhost")+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
 		except Pyro4.errors.NamingError:
 			print('Could not start Pyro naming server. Connect custom python clients from localhost with Pyro4.Proxy("'+str(uri)+'")')
 	if ip == None:

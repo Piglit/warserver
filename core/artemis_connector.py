@@ -282,7 +282,7 @@ def compose_map_col(index, column_data):
 	subtype = package_subtypes_encode["Data-Map"]
 	sectors = struct.pack(">Hb",subtype,index)
 	for s in column_data:
-		sector = struct.pack("<bbbHbbH", s["Rear_Bases"], s["Forward_Bases"], s["Fire_Bases"], s["Enemies"], s["Hidden"], s["Terrain"], len(s["Name"])) + bytes(s["Name"], "utf-8")
+		sector = struct.pack("<bbbHbbH", s["Rear_Bases"], s["Forward_Bases"], s["Fire_Bases"], s["Enemies"], s["Hidden"] or s["fog"], s["Terrain"], len(s["Name"])) + bytes(s["Name"], "utf-8")
 		sectors += sector
 	return sectors
 
