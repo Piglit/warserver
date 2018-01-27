@@ -97,7 +97,7 @@ class Game:
 					"Beachhead":		(col,row) in self.beachheads,
 					"pending_invaders":	0,	#should be only visible to GM
 					"blocked":			False, #only visible to GM. prevents entering the sector
-					"fog":				True, #if true, this sector must be discovered first, before it can be seen
+					"fog":				self.settings["fog of war"], #if true, this sector must be discovered first, before it can be seen
 					"always_enterable":	False, #if true, you can always enter the sector, regardless of enemies or neighbouring sectors or ships inside. However Hidden and blocked still prevent entering.
 					"last_update":		0.0,
 				}
@@ -169,10 +169,6 @@ class Game:
 					map[x][y][k] += v
 				else: 
 					map[x][y][k] = v
-			if self.settings["fog of war"]:
-				for x in range(0,8):
-					for y in range(0,8):
-						map[x][y]["Hidden"] = map[x][y]["Hidden"] or map[x][y]["fog"]
 			return map
 
 
@@ -208,8 +204,6 @@ class Game:
 						sector[k] += v
 					else: 
 						sector[y][k] = v
-			if self.settings["fog of war"]:
-				sector["Hidden"] = sector["Hidden"] or sector["fog"]
 			return sector
 
 
@@ -554,7 +548,7 @@ class Game:
 				self.scoreboard_clears[shipname] += 1
 				self.map[x][y]["Enemies"] = 0
 				for _x, _y in self._all_neighbours(x,y):
-					self.map[_x][_y]["fog"] = False
+					self.map[_x][_y]["fog"] = self.settings["fog of war"]
 				self._map_changed()
 				t = time.time()
 				self.various_last_update = t
