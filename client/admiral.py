@@ -47,12 +47,22 @@ caption_color="white"
 
 class InfoFrame(TK.LabelFrame):
 	info_pane = None
-	def __init__(self, fg=None, captionfg=caption_color, **kwargs):
+	def __init__(self, fg=None, captionfg=caption_color, function=None, **kwargs):
 		TK.LabelFrame.__init__(self, InfoFrame.info_pane, fg=captionfg, borderwidth=1, **kwargs)
 		self.fg=fg
+		self.function = function
 
 	def show(self, sticky="nwes", **kwargs):
 		InfoFrame.info_pane.add(self,sticky=sticky, **kwargs)
+
+	def enable_right_click_menu(self):
+		assert self.function != None
+		#must be called when all children are registerd
+		self.bind("<3>", self.function)
+		for child in self.winfo_children():
+			bindtags = list(child.bindtags())
+			bindtags.insert(1, self)
+			child.bindtags(tuple(bindtags))
 
 class VariableLabel(TK.StringVar):
 	def __init__(self, parent, row=None, text=None, textvariable=None, hidden=False, **kwargs):
@@ -226,6 +236,9 @@ class Sector:
 		else:
 			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 
+	def on_right_click(self, event):
+		self.on_click(event)
+		pass
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -246,6 +259,7 @@ class SectorMapFrame(TK.Frame):
 		TK.Label(self, fg="#00fc00",textvariable=sector["Ships"]).grid			(row=2, column=0, columnspan=3, sticky="NW")
 		TK.Label(self, fg="white", 	textvariable=sector["Coordinates"]).grid	(row=3, column=0, sticky="SW")
 		self.bind("<1>", sector.on_click)
+		self.bind("<3>", sector.on_right_click)
 		for child in self.winfo_children():
 			bindtags = list(child.bindtags())
 			bindtags.insert(1, self)
@@ -275,11 +289,17 @@ class SectorInfoFrame(InfoFrame):
 			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["Ships"], 		wraplength=240, ),
 			VariableLabel(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"]),
 		]
-		#self.bh_label = TK.Label(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"])
-		#self.bh_label.grid(row=9, column=0, columnspan=2, sticky="WE")
-		TK.Button(self, text="Place Rear Base (-1 Base Point)", 	command=functools.partial(sector.place_base,1)).grid(row=10, column=0, columnspan=2, sticky="WE")
-		TK.Button(self, text="Place Forward Base (-2 Base Point)", 	command=functools.partial(sector.place_base,2)).grid(row=11, column=0, columnspan=2, sticky="WE")
-		TK.Button(self, text="Place Fire Base (-3 Base Point)", 	command=functools.partial(sector.place_base,3)).grid(row=12, column=0, columnspan=2, sticky="WE")
+
+		self.bind("<3>", sector.on_right_click)
+		for child in self.winfo_children():
+			bindtags = list(child.bindtags())
+			bindtags.insert(1, self)
+			child.bindtags(tuple(bindtags))
+
+		if allow_privilege("admiral"):
+			TK.Button(self, text="Place Rear Base (-1 Base Point)", 	command=functools.partial(sector.place_base,1)).grid(row=10, column=0, columnspan=2, sticky="WE")
+			TK.Button(self, text="Place Forward Base (-2 Base Point)", 	command=functools.partial(sector.place_base,2)).grid(row=11, column=0, columnspan=2, sticky="WE")
+			TK.Button(self, text="Place Fire Base (-3 Base Point)", 	command=functools.partial(sector.place_base,3)).grid(row=12, column=0, columnspan=2, sticky="WE")
 		Sector.info_pane.add(self, hide=True)
 
 	def set_color(self,color):
@@ -458,6 +478,37 @@ class IncreasableLabel(ModifiableLabel):
 	def _dec(self, delta):
 		self._inc(-delta)
 
+def turn_menu(event):
+	if allow_privilege("admiral"):
+		if state["turn"]["interlude"] and time_remain > 10.0:
+			pass
+			#skip interlude, but make sure, theres enough time left! Rece condition must be prevented!
+			#game.end_turn()
+	if allow_privilege("gm"):
+		pass
+		#change_turn_number
+		#change_max_turns
+		#end_turn
+		#change_turn_time_remaining
+		#change_base_points
+
+def score_menu(event):
+	if allow_privilege("admiral"):
+		pass
+		#merge two ships scores
+	if allow_privilege("gm"):
+		pass
+		#change_scoreboard_kills
+		#change_scoreboard_clears
+
+
+def tech_menu(event):
+	pass
+
+def settings_menu(event):
+	pass
+
+
 print("Connecting to WarServer...")
 game = Pyro4.Proxy("PYRONAME:warserver_game_master")
 game.get_nothing()
@@ -513,12 +564,13 @@ status_bar.grid(row=1, sticky="wse")
 
 #info_pane layout
 InfoFrame.info_pane = info_pane
-turn_frame = 	InfoFrame(text="Status", bg=turn_color, fg=turn_text_color)
-score_frame = 	TableFrame(text="Ship Information", bg=ships_color, fg=turn_text_color)
-tech_frame = 	TableFrame(text="Connected Clients", bg=ships_color, fg=turn_text_color)
+turn_frame = 	InfoFrame(text="Status", 				bg=turn_color,	fg=turn_text_color, function=turn_menu)
+score_frame = 	TableFrame(text="Ship Information", 	bg=ships_color,	fg=turn_text_color, function=score_menu)
+tech_frame = 	TableFrame(text="Connected Clients", 	bg=ships_color,	fg=turn_text_color, function=tech_menu)
 
 
 turn_frame.show()
+turn_frame.enable_right_click_menu()
 
 
 #turns
@@ -538,9 +590,6 @@ VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_s
 #base points
 base_points = VariableLabel(turn_frame, text="Base Points")
 
-
-
-
 #map
 Sector.configure_class(map_frame, info_pane)
 map_data = []
@@ -551,15 +600,18 @@ for col in range(0,8):
 	for row in range(0,8):
 		map_data[col].append(Sector(col, row))
 
-
 #scoreboard
 score_frame.show()
 score_frame.set_column_headings("Name","Kills","Clears", bg=ships_color, fg="white")
+score_frame.enable_right_click_menu()
 
 #techboard
 if allow_privilege("gm"):
 	tech_frame.show()
 	tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
+	tech_frame.enable_right_click_menu() #not implemented yet
+
+
 
 def update():
 	global time_remain
@@ -628,9 +680,15 @@ def update():
 
 		if "scoreboard" in updates:
 			for name in state["scoreboard"][1]:
-				if name not in score_frame:
-					score_frame.add_row(name, fg="cyan")
-				score_frame.set_row(name, Name=name, Kills=state["scoreboard"][1][name], Clears=state["scoreboard"][0].get(name))
+				kills = state["scoreboard"][1].get(name)
+				clears = state["scoreboard"][0].get(name)
+				if (kills == None or kills == 0) and (clears == None or clears == 0):
+					if name in score_frame:
+						scoreboard.remove_row(name)
+				else:
+					if name not in score_frame:
+						score_frame.add_row(name, fg="cyan")
+					score_frame.set_row(name, Name=name, Kills=state["scoreboard"][1][name], Clears=state["scoreboard"][0].get(name))
 			info_pane.paneconfig(score_frame, height=score_frame.winfo_reqheight())
 
 		if "sectors" in updates:
