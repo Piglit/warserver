@@ -303,7 +303,7 @@ class Game:
 				self._next_turn()
 			self.turn["last_update"] = time.time()
 
-	def change_setting(self,setting,value):
+	def change_setting(self,key,value):
 		with self._lock:
 			try:
 				assert(type(self.settings[key]) == type(value))
@@ -312,7 +312,7 @@ class Game:
 			except Exception as e:
 				print(e)
 
-	def set_setting(self,setting,value):
+	def set_setting(self,key,value):
 		with self._lock:
 			try:
 				assert(type(self.settings[key]) == type(value))
@@ -671,13 +671,14 @@ class Game:
 		so you can see what happens without modifying the actual map.
 		"""
 		with self._lock:
-			enemies = self.settings["invaders per turn"] // len(self.beachheads)
-			plus_one = self.settings["invaders per turn"] % len(self.beachheads)
-			for x,y in self.beachheads:
-				map[x][y]["Enemies"] += enemies
-				if plus_one > 0:
-					map[x][y]["Enemies"] += 1
-					plus_one -= 1
+			if len(self.beachheads) > 0 and self.settings["invaders per turn"] > 0:
+				enemies = self.settings["invaders per turn"] // len(self.beachheads)
+				plus_one = self.settings["invaders per turn"] % len(self.beachheads)
+				for x,y in self.beachheads:
+					map[x][y]["Enemies"] += enemies
+					if plus_one > 0:
+						map[x][y]["Enemies"] += 1
+						plus_one -= 1
 
 			
 	def _enemies_proceed(self,map):
@@ -692,6 +693,8 @@ class Game:
 				for row in range(8):
 					sector = map[col][row]
 					neighbours = self._neighbours(col,row)
+					if len(neighbours) == 0:
+						continue
 					enemies = sector["Enemies"] // len(neighbours)
 					for t in copy.copy(neighbours):
 						x,y = t
@@ -699,8 +702,11 @@ class Game:
 							neighbours.remove(t)
 						elif map[x][y]["Hidden"]:
 							neighbours.remove(t)
+					if len(neighbours) == 0:
+						continue
 					if self.settings["hidden sectors cant be neighbours"]:
 						enemies = sector["Enemies"] // len(neighbours)
+
 					for t in neighbours:
 						x,y = t
 						map[x][y]["pending_invaders"] += enemies

@@ -22,9 +22,8 @@ terrain_types = {
 	6:    "Crossroads",               
 }
 
-
-PRIVILEGE_LEVEL = "admiral"
-#PRIVILEGE_LEVEL = "gm"
+#PRIVILEGE_LEVEL = "admiral"
+PRIVILEGE_LEVEL = "gm"
 privilege_flags = {	#binary flags!
 	"gm-admiral":	3,
 	"gm":		2,
@@ -59,6 +58,7 @@ class InfoFrame(TK.LabelFrame):
 		assert self.function != None
 		#must be called when all children are registerd
 		self.bind("<3>", self.function)
+		self.bind("<1>", destroy_right_click_menu)
 		for child in self.winfo_children():
 			bindtags = list(child.bindtags())
 			bindtags.insert(1, self)
@@ -163,6 +163,7 @@ class Sector:
 			for key in self.variables:
 				if key in sector:
 					self.variables[key].set(sector[key])
+			self["Coordinates"].set(chr(col+ord('A'))+" "+str(row+1))
 			self["Terrain_string"].set(terrain_types[sector["Terrain"]])
 			self["Difficulty"].set(sector["Difficulty_mod"]+state["settings"]["game difficulty level"])
 			if sector["Beachhead"]:
@@ -182,6 +183,7 @@ class Sector:
 		else:
 			for key in self.variables:
 				self.variables[key].set("")
+
 		color = ""	
 		if self.variables["Ships"].get() != "":
 			color = "#000033"
@@ -196,6 +198,9 @@ class Sector:
 		else:
 			color="#333300"	
 		self.set_color(color)
+
+	def push_to_server(self, key, value):
+		pass
 		
 	def set_color(self,color):
 		self.color = color
@@ -220,6 +225,7 @@ class Sector:
 		force_update.set()
 
 	def on_click(self, event):
+		destroy_right_click_menu()
 		if Sector.selected_sector != None:
 			Sector.selected_sector.map_frame.config(relief="ridge")
 			Sector.info_pane.paneconfig(Sector.selected_sector.info_frame, hide=True)
@@ -237,8 +243,24 @@ class Sector:
 			Sector.info_pane.paneconfig(self.info_frame, hide=False, height=self.info_frame.winfo_reqheight(), width=Sector.info_pane.desired_width)
 
 	def on_right_click(self, event):
-		self.on_click(event)
-		pass
+		m = place_right_click_menu(event)
+		if allow_privilege("admiral"):
+			if not isinstance(event.widget, SectorInfoFrame):
+				m.add_command(label="show detailed info", command=functools.partial(self.on_click, event))
+			m.add_command(label="Place Rear Base (-1 Base Point)", 	command=functools.partial(self.place_base,1))
+			m.add_command(label="Place Forward Base (-2 Base Point)", 	command=functools.partial(self.place_base,2))
+			m.add_command(label="Place Fire Base (-3 Base Point)", 	command=functools.partial(self.place_base,3))
+		if allow_privilege("gm"):
+			if allow_privilege("admiral"):
+				m.add_separator()
+			ac = TK.Menu(m, tearoff=False)
+			m.add_cascade(label = "Set Accessability", menu = ac)
+			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.change_sector, self.x, self.y, "Hidden", not state["map"][self.x][self.y]["Hidden"]))
+			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.change_sector, self.x, self.y, "fog", not state["map"][self.x][self.y]["fog"]))
+			terrain = TK.Menu(m, tearoff=False)
+			m.add_cascade(label="Set Terrain", menu = terrain)
+			for key in terrain_types:
+				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.change_sector, self.x, self.y, "Terrain", terrain_types[key]))
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -268,7 +290,8 @@ class SectorMapFrame(TK.Frame):
 	def set_color(self,color):
 		self.config(bg=color)	
 		for child in self.winfo_children():
-			child.config(bg=color)
+			if not isinstance(child, TK.Menu):
+				child.config(bg=color)
 			
 class SectorInfoFrame(InfoFrame):
 	"""This is a sectors detail frame, owned by a Sector object"""
@@ -291,6 +314,7 @@ class SectorInfoFrame(InfoFrame):
 		]
 
 		self.bind("<3>", sector.on_right_click)
+		self.bind("<1>", destroy_right_click_menu)
 		for child in self.winfo_children():
 			bindtags = list(child.bindtags())
 			bindtags.insert(1, self)
@@ -305,7 +329,7 @@ class SectorInfoFrame(InfoFrame):
 	def set_color(self,color):
 		self.config(bg=color)	
 		for child in self.winfo_children():
-			if not isinstance(child, TK.Button):
+			if not isinstance(child, TK.Button) and not isinstance(child, TK.Menu):
 				child.config(bg=color)
 
 class TableFrame(InfoFrame):
@@ -402,93 +426,37 @@ class Clock(TK.StringVar):
 				clock.decrease(time_diff)
 
 
-class ModifiableLabel(TK.Frame):
-	def __init__(self, parent, textvariable=None, backend_setter=None, needed_privilege_level="gm", **kwargs):
-		TK.Frame__init__(self, parent, **kwargs)
-		self.modifiable = privilege_flags[needed_privilege_level] & privilege_flags[PRIVILEGE_LEVEL]
-		#TODO test^	
-		self.textvariable = textvariable
-		self.backend_setter = backend_setter
-		self.label = TK.Label(self, textvariable=textvariable, **kwargs)
-		self.label.grid(row=1, sticky="we")
+def destroy_right_click_menu(_=None):
+	global right_click_menu
+	if right_click_menu != None:
+		right_click_menu.destroy()
 
-class IncreasableLabel(ModifiableLabel):
-	def __init__(self, *args, **kwargs):
-		ModifiableLabel.__init__(self,*args,**kwargs)
-		if self.modifiable:
-			self.downframe = TK.Frame(self, **kwargs)
-			self.upframe = TK.Frame(self, **kwargs)
-			self.downframe.grid(row=2, sticky="we")
-			self.upframe.grid(row=0, sticky="we")
-			self.buttoncolmns = 0
-			self._reset_buttons(float(self.textvariable.get()))
+def place_right_click_menu(event):
+	global right_click_menu
+	destroy_right_click_menu()
+	right_click_menu = TK.Menu(event.widget, tearoff=False)
+	right_click_menu.post(event.x_root, event.y_root)
+	return right_click_menu
 
-	def _reset_buttons(self, value):
-		if isinstance(self.textvariable, Clock):
-			if len(value) <= 2 and self.buttoncolmns != 2:
-				buttoncolmns = 2
-			elif len(value) <= 5 and self.buttoncolmns != 4:
-				buttoncolmns = 4
-			else:
-				buttoncolmns = 5
-			if self.buttoncolmns != buttoncolmns:
-				self.buttoncolmns = buttoncolmns
-				for child in self.upframe.winfo_children():
-					child.destroy()
-				for child in self.downframe.winfo_children():
-					child.destroy()
-				multiplier = 1
-				for i in range(0, buttoncolmns):
-					#TODO add placeholder for : in display
-					TK.Button(self.upframe, 	command=functools.partial(self._inc, multiplier)).grid(column=buttoncolmns-1-i, row=0, sticky="we")
-					TK.Button(self.downframe, 	command=functools.partial(self._dec, multiplier)).grid(column=1, row=buttoncolmns-1-i, sticky="we")
-					if i%2 == 0:
-						multiplier *= 10
-					else:
-						multiplier *= 6
-		else:
-			if value > 19 and self.buttoncolmns != 2:
-				self.buttoncolmns = 2
-				for child in self.upframe.winfo_children():
-					child.destroy()
-				for child in self.downframe.winfo_children():
-					child.destroy()
-				TK.Button(self.upframe, 	command=functools.partial(self._inc, 1)).grid(column=1, row=0, sticky="we")
-				TK.Button(self.downframe, 	command=functools.partial(self._dec, 1)).grid(column=1, row=0, sticky="we")
-				TK.Button(self.upframe, 	command=functools.partial(self._inc, 10)).grid(column=0, row=0, sticky="we")
-				TK.Button(self.downframe, 	command=functools.partial(self._dec, 10)).grid(column=0, row=0, sticky="we")
-			elif value < 10 and self.buttoncolmns != 1:
-				self.buttoncolmns = 1
-				for child in self.upframe.winfo_children():
-					child.destroy()
-				for child in self.downframe.winfo_children():
-					child.destroy()
-				TK.Button(self.upframe, 	command=functools.partial(self._inc, 1)).grid(column=0, row=0, sticky="we")
-				TK.Button(self.downframe, 	command=functools.partial(self._dec, 1)).grid(column=0, row=0, sticky="we")
-				self.lastvalue = value
 
-	def _inc(self, delta):
-		#not threadsave
-		value = float(self.textvariable.get()) + delta
-#		self.textvariable.set(value)	#make it visible, variable will be set correctly at next udate (FIXME or not if remote set fails!)
-		self.backend_setter(delta)	#does not call force update
-		#Better less responsive then faulty behaviour
-		self._reset_buttons(value)
-
-	def _dec(self, delta):
-		self._inc(-delta)
+def skip_interlude():
+	if state["turn"]["interlude"] and time_remain > 10.0:
+		game.end_turn()	
 
 def turn_menu(event):
+	m = place_right_click_menu(event)
 	if allow_privilege("admiral"):
 		if state["turn"]["interlude"] and time_remain > 10.0:
-			pass
-			#skip interlude, but make sure, theres enough time left! Rece condition must be prevented!
-			#game.end_turn()
+			m.add_command(label="Skip Interlude", command=skip_interlude)
+			#skip interlude, but make sure, theres enough time left! Race condition must be prevented!
+		else: 
+			m.add_command(label="Skip Interlude", state="disabled")
 	if allow_privilege("gm"):
-		pass
+		m.add_command(label="End Turn", command= functools.partial (game.end_turn))
+		m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))
+		m.add_command(label="Save Game", command= functools.partial (game.save_game, "gm-save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+"_turn_"+str(state["turn"]["turn_number"])+".sav"))
 		#change_turn_number
 		#change_max_turns
-		#end_turn
 		#change_turn_time_remaining
 		#change_base_points
 
@@ -543,6 +511,8 @@ if root.maxsize()[1] >= 700:
 	#root.option_add("*Font", "Trebuchet")
 	root.option_add("*Font", "Bierbaron")
 
+right_click_menu = None
+
 master_frame =	TK.PanedWindow(root, orient=TK.HORIZONTAL)
 master_frame.grid(sticky="nwse")
 master_frame.columnconfigure(0, weight=1)
@@ -568,11 +538,6 @@ turn_frame = 	InfoFrame(text="Status", 				bg=turn_color,	fg=turn_text_color, fu
 score_frame = 	TableFrame(text="Ship Information", 	bg=ships_color,	fg=turn_text_color, function=score_menu)
 tech_frame = 	TableFrame(text="Connected Clients", 	bg=ships_color,	fg=turn_text_color, function=tech_menu)
 
-
-turn_frame.show()
-turn_frame.enable_right_click_menu()
-
-
 #turns
 time_remain = 0.0
 time_updated_clock = 0.0
@@ -589,6 +554,9 @@ VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_s
 
 #base points
 base_points = VariableLabel(turn_frame, text="Base Points")
+
+turn_frame.show()
+turn_frame.enable_right_click_menu()
 
 #map
 Sector.configure_class(map_frame, info_pane)

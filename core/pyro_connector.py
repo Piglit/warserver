@@ -6,6 +6,17 @@ from Pyro4 import naming
 
 import engine
 
+terrain_types = {
+	"Empty":					0,		
+	"Sector":					0,		
+	"Nebula":			   		1,	
+	"Minefield":				2,	
+	"Asteroid Belt":			3,	
+	"Black Hole Nursery":   	4,	
+	"Wildlands":				5,	
+	"Crossroads":		   		6,	
+}
+
 @Pyro4.expose
 class Observer:
 	"""
@@ -136,7 +147,16 @@ class GM(Observer):
 		assert x >= 0 and x < 8, "0 <= x <= 7"
 		assert y >= 0 and y < 8, "0 <= y <= 7"
 		assert key in engine.game.get_map(client=self.role)[x][y], str(key)+" does not exist in sector."
-		if type(value) == bool or type(value) == str:
+		if key == "Terrain":
+			if type(value) == str:
+				assert value in terrain_types
+				value = terrain_types[value]
+			if type(value) == int:
+				assert value >= 0 and value < 7, "0 <= value <= 6"
+				engine.game.update_sector(x,y,key,value)
+			else:
+				assert False, "Type Error"
+		elif type(value) == bool or type(value) == str:
 			engine.game.update_sector(x,y,key,value)
 		elif type(value) == int:
 			engine.game.change_sector(x,y,key,value)
