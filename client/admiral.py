@@ -94,6 +94,7 @@ class VariableLabel(TK.StringVar):
 		if self.titlelable != None:
 			self.titlelable.grid(row=self.row, column=0, sticky="E")
 		self.varlable.grid	(row=self.row, column=1, sticky="W")
+
 	
 class Sector:
 	"""
@@ -261,6 +262,8 @@ class Sector:
 			m.add_cascade(label="Set Terrain", menu = terrain)
 			for key in terrain_types:
 				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.change_sector, self.x, self.y, "Terrain", terrain_types[key]))
+			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Enemies")))
+			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Difficulty_mod")))
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -442,6 +445,25 @@ def place_right_click_menu(event):
 def skip_interlude():
 	if state["turn"]["interlude"] and time_remain > 10.0:
 		game.end_turn()	
+
+def call_remote_function_from_window(window, remote_function, cast, variable):
+	value = variable.get()
+	value = cast(value)
+	remote_function(value)
+	window.destroy()
+	force_update.set()
+
+def change_integer_dialog(remote_function, text):
+	""" creates a dialoge window that asks for an integer input
+		raises the local_variable about the user given amount
+		and calls the remote_function with the same amount.
+	"""
+	w = TK.Toplevel(root)
+	v = TK.StringVar()
+	TK.Label(w, text=text + " += ").grid(row=0, column=0)
+	TK.Entry(w, textvariable=v).grid(row=0, column=1)
+	TK.Button(w, text="OK", command=functools.partial(call_remote_function_from_window, w, remote_function, int, v)).grid(row=1, column=1)
+	TK.Button(w, text="Cancel", command=w.destroy).grid(row=1,column=0)
 
 def turn_menu(event):
 	m = place_right_click_menu(event)
