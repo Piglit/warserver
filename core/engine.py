@@ -338,7 +338,9 @@ class Game:
 			self.various_last_update = t
 			self.map[x][y]["Beachhead"] = True
 			self.map[x][y]["last_update"] = t
-			return self.beachheads.append((x,y))
+			r = self.beachheads.append((x,y))
+			self._map_changed()
+			return r
 
 	def remove_beachhead(self,x,y):
 		#removes the first occurence of the beachhead from the list.
@@ -350,6 +352,7 @@ class Game:
 			t = time.time()
 			self.various_last_update = t
 			self.map[x][y]["last_update"] = t
+			self._map_changed()
 
 	def add_event_map(self,client,x,y,key,value):
 		"""

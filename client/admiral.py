@@ -164,7 +164,7 @@ class Sector:
 			for key in self.variables:
 				if key in sector:
 					self.variables[key].set(sector[key])
-			self["Coordinates"].set(chr(col+ord('A'))+" "+str(row+1))
+			self["Coordinates"].set(chr(self.x+ord('A'))+" "+str(self.y+1))
 			self["Terrain_string"].set(terrain_types[sector["Terrain"]])
 			self["Difficulty"].set(sector["Difficulty_mod"]+state["settings"]["game difficulty level"])
 			if sector["Beachhead"]:
@@ -262,8 +262,11 @@ class Sector:
 			m.add_cascade(label="Set Terrain", menu = terrain)
 			for key in terrain_types:
 				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.change_sector, self.x, self.y, "Terrain", terrain_types[key]))
-			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Enemies")))
-			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Difficulty_mod")))
+			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Enemies"), "Enemies"))
+			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Difficulty_mod"), "Difficulty"))
+			m.add_command(label="Add Beachhead",	command=functools.partial (game.add_beachhead, self.x, self.y))
+			m.add_command(label="Remove Beachhead",	command=functools.partial (game.remove_beachhead, self.x, self.y))
+			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.change_sector, self.x, self.y, "Name"), "Sector Name"))
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -465,6 +468,31 @@ def change_integer_dialog(remote_function, text):
 	TK.Button(w, text="OK", command=functools.partial(call_remote_function_from_window, w, remote_function, int, v)).grid(row=1, column=1)
 	TK.Button(w, text="Cancel", command=w.destroy).grid(row=1,column=0)
 
+def change_float_dialog(remote_function, text):
+	""" creates a dialoge window that asks for an integer input
+		raises the local_variable about the user given amount
+		and calls the remote_function with the same amount.
+	"""
+	w = TK.Toplevel(root)
+	v = TK.StringVar()
+	TK.Label(w, text=text + " += ").grid(row=0, column=0)
+	TK.Entry(w, textvariable=v).grid(row=0, column=1)
+	TK.Button(w, text="OK", command=functools.partial(call_remote_function_from_window, w, remote_function, float, v)).grid(row=1, column=1)
+	TK.Button(w, text="Cancel", command=w.destroy).grid(row=1,column=0)
+
+def change_string_dialog(remote_function, text):
+	""" creates a dialoge window that asks for an integer input
+		raises the local_variable about the user given amount
+		and calls the remote_function with the same amount.
+	"""
+	w = TK.Toplevel(root)
+	v = TK.StringVar()
+	TK.Label(w, text=text + " = ").grid(row=0, column=0)
+	TK.Entry(w, textvariable=v).grid(row=0, column=1)
+	TK.Button(w, text="OK", command=functools.partial(call_remote_function_from_window, w, remote_function, str, v)).grid(row=1, column=1)
+	TK.Button(w, text="Cancel", command=w.destroy).grid(row=1,column=0)
+
+
 def turn_menu(event):
 	m = place_right_click_menu(event)
 	if allow_privilege("admiral"):
@@ -474,13 +502,17 @@ def turn_menu(event):
 		else: 
 			m.add_command(label="Skip Interlude", state="disabled")
 	if allow_privilege("gm"):
-		m.add_command(label="End Turn", command= functools.partial (game.end_turn))
-		m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))
 		m.add_command(label="Save Game", command= functools.partial (game.save_game, "gm-save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+"_turn_"+str(state["turn"]["turn_number"])+".sav"))
-		#change_turn_number
-		#change_max_turns
-		#change_turn_time_remaining
-		#change_base_points
+		m.add_command(label="End Turn", command= functools.partial (game.end_turn))
+		m.add_command(label="Change Turn Number", command= functools.partial (change_integer_dialog, game.change_turn_number, "Turn Number"))
+		m.add_command(label="Change Total Turns", command= functools.partial (change_integer_dialog, game.change_max_turns, "Total Turns"))
+		m.add_command(label="Change Remaining Time", command= functools.partial (change_integer_dialog, game.change_turn_time_remaining, "Seconds Remaining"))
+		m.add_command(label="Change Base Points", command= functools.partial (change_integer_dialog, game.change_base_points, "Base Points"))
+		m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))
+		m.add_command(label="Change global Difficulty", command= functools.partial (change_integer_dialog, functools.partial(game.change_setting, "game difficulty level"), "global Difficulty"))
+		m.add_command(label="Change Invaders Per Turn", command= functools.partial (change_integer_dialog, functools.partial(game.change_setting, "invaders per turn"), "Invaders per turn"))
+		m.add_command(label="Change Minutes Per Turn", command= functools.partial (change_float_dialog, functools.partial(game.change_setting, "minutes per turn"), "Minutes per turn"))
+		m.add_command(label="Change Minutes between Turns", command= functools.partial (change_float_dialog, functools.partial(game.change_setting, "minutes between turns (interlude)"), "Minutes between turns"))
 
 def score_menu(event):
 	if allow_privilege("admiral"):
