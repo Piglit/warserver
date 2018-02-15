@@ -6,13 +6,7 @@ import sys
 
 import engine
 import artemis_connector
-
-try:
-	import pyro_connector
-except ImportError:
-	PYRO = False
-else:
-	PYRO = True
+import pyro_connector
 
 
 
@@ -56,6 +50,7 @@ def start_game_with_config(filename):
 	print("starting new game with configuration from '" + filename + "'")
 	engine.game=engine.Game(settings)
 
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Starts the Artemis WarServer.') 
 	parser.add_argument('--config', '-c', type=str, default='default.cfg', help='Load config file') 
@@ -69,12 +64,13 @@ if __name__ == "__main__":
 		#both throws an exception if files can not be found
 	artemis_connector.start_server()
 	#json_connector.test()	
-	if PYRO: 
+	if pyro_connector.PYRO: 
 		print(80*'-')
 		pyro_connector.start_pyro_server(ip=args.ip, host=args.nameserver)
 		print(80*'-')
 		print("You may start the admiral or game-master client on this or some other machine in your network.")
 	else:
 		print("Warning: Pyro connector could not be loaded.")
+		pyro_connector.directly_connect_client()
 
 	print("Ready to play!")

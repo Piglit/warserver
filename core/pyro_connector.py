@@ -1,8 +1,20 @@
 import threading
 import copy
 import time
-import Pyro4
-from Pyro4 import naming
+
+try:
+	import bier
+	import Pyro4
+	from Pyro4 import naming
+except ImportError:
+	PYRO = False
+	class Pyro4:
+		"""stub"""
+		def expose(_):
+			return _	
+	game = None
+else:
+	PYRO = True
 
 import engine
 
@@ -265,3 +277,22 @@ def start_pyro_server(ip=None, host=None):
 		print("WARNING: option ip not given. Clients may not connect from other machines than yours. Try:")
 		print("python3 warserver.py --ip <your ip>")
 	threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls
+
+def client():
+	try:
+		import client
+	except Exception as e:
+		global game
+		name = "client_crash_emergency_save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time))+".sav"
+		game.save_game(name)
+		print(80*"-")
+		print("Warning: Client crashed")
+		print("Game saved ("+name+")")
+		print("Game is still running.")
+
+def directly_connect_client():
+	assert not PYRO
+	global game
+	game = GM()
+	threading.Thread(target=client).start()	# start a thread that is seen as main thread for the client
+
