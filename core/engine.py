@@ -316,7 +316,7 @@ class Game:
 		with self._lock:
 			try:
 				assert(type(self.settings[key]) == type(value))
-				self.settings[key] == value
+				self.settings[key] = value
 				self.settings["last_update"] = time.time()
 			except Exception as e:
 				print(e)
@@ -551,7 +551,7 @@ class Game:
 				self.scoreboard_clears[shipname] += 1
 				self.map[x][y]["Enemies"] = 0
 				for _x, _y in self._all_neighbours(x,y):
-					self.map[_x][_y]["fog"] = self.settings["fog of war"]
+					self.map[_x][_y]["fog"] = False 
 				self._map_changed()
 				t = time.time()
 				self.various_last_update = t
