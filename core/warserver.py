@@ -66,7 +66,7 @@ if __name__ == "__main__":
 	#json_connector.test()	
 	if pyro_connector.PYRO: 
 		print(80*'-')
-		pyro_connector.start_pyro_server(ip=args.ip, host=args.nameserver)
+		pyro_connector.start_pyro_server(warserver_ip=args.ip, nameserver_ip=args.nameserver)
 		print(80*'-')
 		print("You may start the admiral or game-master client on this or some other machine in your network.")
 	else:

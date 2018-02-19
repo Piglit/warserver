@@ -3,7 +3,6 @@ import copy
 import time
 
 try:
-	import bier
 	import Pyro4
 	from Pyro4 import naming
 except ImportError:
@@ -252,28 +251,29 @@ class GM(Observer):
 		engine.game.get_turn_status()
 		engine.game._save_game(filename)
 
-def start_pyro_server(ip=None, host=None):
-	daemon = Pyro4.Daemon(host=ip)
+def start_pyro_server(warserver_ip=None, nameserver_ip=None):
+	#TODO warserver_ip autodetect 
+	daemon = Pyro4.Daemon(host=warserver_ip)
 	uri = daemon.register(GM)
 	try:
-		nameserver = Pyro4.locateNS(host=host)
+		nameserver = Pyro4.locateNS(host=nameserver_ip)
 		nameserver.ping()
 		nameserver.register("warserver_game_master",uri)
-		print('Pyro server running on '+str(ip or "localhost")+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
-	except Pyro4.errors.NamingError:
+		print('Pyro server running on '+str(warserver_ip or "localhost")+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+	except (Pyro4.errors.NamingError, OSError):
 		print('No Pyro naming server found. Starting own Pyro naming server.')
 		try:
-			if host == None:
-				host = ""
-			threading.Thread(target=Pyro4.naming.startNSloop, kwargs={"host": host}).start()
+			if nameserver_ip == None:
+				nameserver_ip = ""
+			threading.Thread(target=Pyro4.naming.startNSloop, kwargs={"host": nameserver_ip}).start()
 			#TODO check if this works for all clients in the network
 			nameserver = Pyro4.locateNS()
 			nameserver.ping()
 			nameserver.register("warserver_game_master",uri)
-			print('Pyro server running on '+str(ip or "localhost")+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
+			print('Pyro server running on '+str(warserver_ip or "localhost")+'. Connect custom python clients with Pyro4.Proxy("PYRONAME:warserver_game_master")')
 		except Pyro4.errors.NamingError:
 			print('Could not start Pyro naming server. Connect custom python clients from localhost with Pyro4.Proxy("'+str(uri)+'")')
-	if ip == None:
+	if warserver_ip == None:
 		print("WARNING: option ip not given. Clients may not connect from other machines than yours. Try:")
 		print("python3 warserver.py --ip <your ip>")
 	threading.Thread(target=daemon.requestLoop).start()	# start the event loop of the server to wait for calls
@@ -283,10 +283,10 @@ def client():
 		import client
 	except Exception as e:
 		global game
-		name = "client_crash_emergency_save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time))+".sav"
+		name = "client_crash_emergency_save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+".sav"
 		game.save_game(name)
 		print(80*"-")
-		print("Warning: Client crashed")
+		print("Warning: Client crashed: "+str(e))
 		print("Game saved ("+name+")")
 		print("Game is still running.")
 
