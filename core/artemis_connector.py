@@ -70,7 +70,7 @@ MAP_CHANGED_EVENT = threading.Event()
 def heartbeat(ip, port):
 	"""
 	This function is executed by each heartbeat-thread.
-	It sends a heartbeat package evert 0.5 seconds.
+	It sends a heartbeat package every 0.5 seconds.
 	"""
 	client = (ip, port)
 	heartbeat_number = 0
@@ -94,43 +94,43 @@ def notify():
 		MAP_CHANGED_EVENT.wait(timeout=6)
 		MAP_CHANGED_EVENT.clear()
 		#get whole map once
-		game_map = engine.game.get_map(client=("All-Artemis-Clients"))
+		game_map = engine.game.get_map()
 		assert len(game_map) == 8
 		orig_map_col = []
 		for i in range(8):
 			orig_map_col.append(compose_map_col(i, game_map[i]))
 		unfinished_packages = []
-		turn_status = engine.game.get_turn_status(client=("All-Artemis-Clients"))
+		turn_status = engine.game.get_turn_status()
 		if turn_status["interlude"] != is_interlude:
 			#send turn over package
 			is_interlude = not is_interlude
 			unfinished_packages.append(compose_turn_over())
 		unfinished_packages.append(compose_turn_status(turn_status))
-		unfinished_packages.append(compose_ships(engine.game.get_ships(client=("All-Artemis-Clients"))))
+		unfinished_packages.append(compose_ships(engine.game.get_ships()))
 
 		with CONNECTIONS_LOCK:
 			for client in CONNECTIONS:
 				socket = CONNECTIONS[client]["socket"]
-				updates = engine.game.get_modified_map(client)
-				updated_cols = {}
+				#updates = engine.game.get_modified_map(client)
+				#updated_cols = {}
 				for package in unfinished_packages:
 					try:
 						socket.sendto(compose_data(client, package), client)
 					except Exception as exception:
 						print(exception)
-				for x, y, k, v in sorted(updates):
-					if x not in updated_cols:
-						updated_cols[x] = copy.deepcopy(game_map[x])
-					if isinstance(v, (int, float)):
-						updated_cols[x][y][k] += v
-					else:
-						updated_cols[x][y][k] = v
+				#for x, y, k, v in sorted(updates):
+				#	if x not in updated_cols:
+				#		updated_cols[x] = copy.deepcopy(game_map[x])
+				#	if isinstance(v, (int, float)):
+				#		updated_cols[x][y][k] += v
+				#	else:
+				#		updated_cols[x][y][k] = v
 
 				for i in range(8):
 					try:
-						if i in updated_cols:
-							socket.sendto(compose_data(client, compose_map_col(i, updated_cols[i])), client)
-						else:
+						#if i in updated_cols:
+						#	socket.sendto(compose_data(client, compose_map_col(i, updated_cols[i])), client)
+						#else:
 							socket.sendto(compose_data(client, orig_map_col[i]), client)
 					except Exception as exception:
 						print(exception)
@@ -231,7 +231,7 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 							if "Ship-Name" in sector and sector["Ship-Name"] != package["Ship-Name"]:
 								socket.sendto(compose_data(client, compose_shipname(sector["Ship-Name"])), client)
 								package["Ship-Name"] = sector["Ship-Name"]
-							socket.sendto(compose_data(client, compose_map_sector(sector)), client)
+							socket.sendto(compose_data(client, compose_sector(sector)), client)
 					elif package["subtype"] == "Sector-Leave":
 						engine.game.clear_sector(package["Ship-Name"], package["ID"], client)
 					elif package["subtype"] == "Sector-Kill":
@@ -295,25 +295,25 @@ def compose_map_col(index, column_data):
 	subtype = PACKAGE_SUBTYPES_ENCODE["Data-Map"]
 	sectors = struct.pack(">Hb", subtype, index)
 	for sector_data in column_data:
-		sector = struct.pack("<bbbHbbH", sector_data["Rear_Bases"],
-							 sector_data["Forward_Bases"], sector_data["Fire_Bases"],
-							 sector_data["Enemies"], sector_data["Hidden"] or sector_data["fog"],
-							 sector_data["Terrain"], len(sector_data["Name"])) + bytes(sector_data["Name"], "utf-8")
+		sector = struct.pack("<bbbHbbH", sector_data["rear_bases"],
+							 sector_data["forward_bases"], sector_data["fire_bases"],
+							 sector_data["enemies"], sector_data["hidden"],
+							 sector_data["terrain"], len(sector_data["name"])) + bytes(sector_data["name"], "utf-8")
 		sectors += sector
 	return sectors
 
-def compose_map_sector(sector_data):
+def compose_sector(sector_data):
 	"""creates a sector for a client to play"""
 	subtype = struct.pack(">H", PACKAGE_SUBTYPES_ENCODE["Data-Sector"])
-	return subtype + struct.pack("<HbbbbHxxHxxbxxxb", sector_data["Enemies"],
-								 sector_data["Rear_Bases"], sector_data["Forward_Bases"],
-								 sector_data["Fire_Bases"], sector_data["??"],
-								 sector_data["Seed"], sector_data["ID"],
-								 sector_data["Difficulty"], sector_data["Terrain"])
+	return subtype + struct.pack("<HbbbbHxxHxxbxxxb", sector_data["enemies"],
+								 sector_data["rear_bases"], sector_data["forward_bases"],
+								 sector_data["fire_bases"], sector_data["unknown"],
+								 sector_data["seed"], sector_data["id"],
+								 sector_data["difficulty"], sector_data["terrain"])
 
-def compose_ships(ships: dict):
+def compose_ships(ships):
 	"""creates a list of ship descriptions"""
-	#ship: (shipname, x, y, sector["ID"], sector["Enemies"])
+	#ship: (shipname, x, y)
 	package = struct.pack(">H", PACKAGE_SUBTYPES_ENCODE["Data-Ships"])
 	for s in ships:
 		ship = ships[s]
@@ -333,7 +333,7 @@ def compose_turn_over():
 	return struct.pack(">H", PACKAGE_SUBTYPES_ENCODE["Data-Turn-Over"])
 
 def compose_shipname(name):
-	"""creates a package that changes the shps name"""
+	"""creates a package that changes the ships name"""
 	subtype = PACKAGE_SUBTYPES_ENCODE["Data-Ship-Name"]
 	return struct.pack(">H", subtype) + struct.pack("<H", len(name)) + bytes(name, "utf-8")
 
