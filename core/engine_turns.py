@@ -5,8 +5,9 @@ Here the map and the game state is represented.
 Other modules communicate with this module to read and to write the game state.
 """
 
-from game_state import game
-form countdown import countdown
+from box import Box
+from core.game_state import game
+from core.countdown import countdown
 
 ## game state structure needed by this module:
 # game
@@ -38,6 +39,8 @@ __author__ = "Pithlit"
 __version__ = 1.0
 
 def init_turns(skip_turns=6):
+	if not game.turn:
+		game.turn = Box(default_box=True)
 	if not game.turn.turn_number:
 		game.turn.turn_number = 1
 		game.turn.interlude = False
@@ -48,13 +51,6 @@ def init_turns(skip_turns=6):
 		enemies_spawn()
 	defeat_bases()
 	game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
-	updated("turn")
-		self.end_of_last_turn = time.time()
-
-		self.reset_fog()
-		self._timer_thread.start()
-		print("Game Engine started")
-
 
 def proceed_turn():
 	"""proceeds to the next turn"""
@@ -71,15 +67,12 @@ def proceed_turn():
 			enemies_proceed()
 			enemies_spawn()
 			engine_artemis.release_all_ships()
-			updated("map")
 			turn.turn_number += 1
 			if game.rules.no_interludes:
 				game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
 			else:
 				turn.interlude = True
 				game.countdown = countdown(game.rules.seconds_per_interlude, proceed_turn)
-		updated("turn")
-		updated("countdown")
 
 			#game.save("_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(t))+"_turn_"+str(turn["turn_number"])+".sav")
 
@@ -146,18 +139,18 @@ def enemies_proceed():
 	with game._lock:
 		for col in range(8):
 			for row in range(8):
-				sector = map[col][row]
+				sector = game.map[col][row]
 				neighbours = _adjacent_for_enemies(col, row)
 				if len(neighbours) == 0:
 					continue
-				enemies = sector["enemies"] // len(neighbours)
+				enemies = sector.get("enemies",0) // len(neighbours)
 				for s in neighbours:
 					s["pending_invaders"] += enemies
-				sector["Enemies"] -= enemies
+				sector["enemies"] -= enemies
 		for col in range(8):
 			for row in range(8):
-				map[col][row]["enemies"] += map[col][row]["pending_invaders"]
-				map[col][row]["pending_invaders"] = 0
+				game.map[col][row]["enemies"] += game.map[col][row]["pending_invaders"]
+				game.map[col][row]["pending_invaders"] = 0
 
 def _adjacent_for_enemies(x_0, y_0):
 	"""returns all sectors, that count as connected for enemies"""
@@ -180,7 +173,7 @@ def _adjacent_for_enemies(x_0, y_0):
 		if y < 0 or y >= 8:
 			continue
 		s = game.map[x][y]
-		if s.hidden:
+		if s.get("hidden"):
 			continue
 		result.append(s)
 	return result

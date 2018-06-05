@@ -21,7 +21,7 @@ import struct
 import time
 from warnings import warn
 
-import engine
+import core.engine_artemis as engine
 
 __author__ = "Pithlit"
 __version__	= 1.1
@@ -94,24 +94,24 @@ def notify():
 		MAP_CHANGED_EVENT.wait(timeout=6)
 		MAP_CHANGED_EVENT.clear()
 		#get whole map once
-		game_map = engine.game.get_map()
+		game_map = engine.get_map()
 		assert len(game_map) == 8
 		orig_map_col = []
 		for i in range(8):
 			orig_map_col.append(compose_map_col(i, game_map[i]))
 		unfinished_packages = []
-		turn_status = engine.game.get_turn_status()
+		turn_status = engine.get_turn_status()
 		if turn_status["interlude"] != is_interlude:
 			#send turn over package
 			is_interlude = not is_interlude
 			unfinished_packages.append(compose_turn_over())
 		unfinished_packages.append(compose_turn_status(turn_status))
-		unfinished_packages.append(compose_ships(engine.game.get_ships()))
+		unfinished_packages.append(compose_ships(engine.get_ships()))
 
 		with CONNECTIONS_LOCK:
 			for client in CONNECTIONS:
 				socket = CONNECTIONS[client]["socket"]
-				#updates = engine.game.get_modified_map(client)
+				#updates = engine.get_modified_map(client)
 				#updated_cols = {}
 				for package in unfinished_packages:
 					try:
@@ -226,17 +226,17 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 				elif package["type"] == "Sector":
 					socket.sendto(ack("Sector-Ack", package), client)
 					if package["subtype"] == "Sector-Enter":
-						sector = engine.game.enter_sector(package["X"], package["Y"], package["Ship-Name"], client)
+						sector = engine.enter_sector(package["X"], package["Y"], package["Ship-Name"], client)
 						if sector is not None:
 							if "Ship-Name" in sector and sector["Ship-Name"] != package["Ship-Name"]:
 								socket.sendto(compose_data(client, compose_shipname(sector["Ship-Name"])), client)
 								package["Ship-Name"] = sector["Ship-Name"]
 							socket.sendto(compose_data(client, compose_sector(sector)), client)
 					elif package["subtype"] == "Sector-Leave":
-						engine.game.clear_sector(package["Ship-Name"], package["ID"], client)
+						engine.clear_sector(package["Ship-Name"], package["ID"], client)
 					elif package["subtype"] == "Sector-Kill":
 						if check_sector_replay(client, package["Number"]):
-							engine.game.kills_in_sector(package["Ship-Name"], package["ID"], package["Kills"], client)
+							engine.kills_in_sector(package["Ship-Name"], package["ID"], package["Kills"], client)
 			else:
 				warn("client not in CONNECTIONS list. Waiting for client to reconnect.")
 
@@ -447,7 +447,7 @@ SERVER = socketserver.UDPServer((HOST, PORT), ArtemisUDPHandler)	#Blocking.
 
 def start_server():
 	"""initializes and start this module"""
-	engine.game.register_notification(MAP_CHANGED_EVENT)
+	#engine.register_notification(MAP_CHANGED_EVENT)
 	threading.Thread(target=notify).start()
 	threading.Thread(target=SERVER.serve_forever).start()
 	print("Server is listening for Artemis clients.")

@@ -8,7 +8,8 @@ If you are used to an object-orientaded programming paradigm, you can see those 
 __author__ = "Pithlit"
 __version__ = 1.2
 
-from game_state import game
+import copy
+from core.game_state import game
 
 
 

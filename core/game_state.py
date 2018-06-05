@@ -107,13 +107,19 @@ def create_game(save):
 	"""creates a new game from file. (file may be empty)"""
 	global game
 	if save:
-		game = Box(pickle.load(save), default_box=True)
+		try:
+			game.update(Box(pickle.load(save), default_box=True))
+		except:
+			game.update(Box(yaml.load(save), default_box=True))
 	else:
-		game = Box(default_box=True)
+		pass
 	if not game.map:
-		game.map = BoxList([[Box({'x':x,'y':y}) for y in range(8)] for x in range(8)] ,default_box=True)
+		game.map = BoxList([[Box({'x':x,'y':y}, default_box=True, default_box_attr=0) for y in range(8)] for x in range(8)] ,default_box=True)
+	for x in range(8):
+		for y in range(8):
+			game.map[x][y]._box_config["default_box"] = True
+			game.map[x][y]._box_config["default_box_attr"] = 0
 	game._lock = threading.RLock()
 	print("game object created")
 	return game
-
 

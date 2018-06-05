@@ -3,7 +3,7 @@ import threading
 import time
 
 class countdown:
-	def __init__(self, seconds, cmd, args*, kwargs**):
+	def __init__(self, seconds, cmd, *args, **kwargs):
 		self.seconds = seconds
 		self.cmd = cmd
 		self.args = args
