@@ -2,6 +2,8 @@
 from box import Box, BoxList
 import pickle
 import threading
+import random
+import copy
 
 """the game object is accessible from all engine modules"""
 game = Box(default_box=True)
@@ -22,6 +24,31 @@ game = Box(default_box=True)
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
 
+DEFAULT_SECTOR = {
+	"gm_forbid":	False,
+	"gm_allow":		False,
+	"hidden":		False,
+	"fog":			False,
+	"client_inside":	[],
+	"hinder_movement":	False,
+	"difficulty":	5,
+	"enemies":		0,
+	"rear_bases":	0,
+	"forward_bases":0,
+	"fire_bases":	0,
+	"terrain":	"Sector",
+	"unknown":	0,
+	"name":	"",
+	"pending_invaders":	0,
+	"beachhead_weight":	1,
+}
+def init_sector(**kwargs):
+	s = copy.deepcopy(DEFAULT_SECTOR)
+	print(s)
+	for k,v in kwargs.items():
+		s[k] = v
+	print(s)
+	return s
 
 ## game state structure needed by this module:
 # game
@@ -114,12 +141,9 @@ def create_game(save):
 	else:
 		pass
 	if not game.map:
-		game.map = BoxList([[Box({'x':x,'y':y}, default_box=True, default_box_attr=0) for y in range(8)] for x in range(8)] ,default_box=True)
-	for x in range(8):
-		for y in range(8):
-			game.map[x][y]._box_config["default_box"] = True
-			game.map[x][y]._box_config["default_box_attr"] = 0
+		game.map = BoxList([[Box(init_sector(x=x,y=y), default_box=True) for y in range(8)] for x in range(8)] ,default_box=True)
 	game._lock = threading.RLock()
 	print("game object created")
+	print(game)
 	return game
 

@@ -4,13 +4,19 @@ import time
 
 class countdown:
 	def __init__(self, seconds, cmd, *args, **kwargs):
-		self.seconds = seconds
+		if seconds:
+			self.seconds = seconds
+		else: 
+			self.seconds = 0
 		self.cmd = cmd
 		self.args = args
 		self.kwargs = kwargs
 		self.started = None
-		self.paused = False
-		self.start()
+		if seconds:
+			self.paused = False
+			self.start()
+		else:
+			self.paused = True 
 
 	def get_remaining(self):
 		return self.seconds - (time.time() - self.started)

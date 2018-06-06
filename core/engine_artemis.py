@@ -14,16 +14,6 @@ from core.game_state import game
 
 
 #not used now, but these strings are diplayed in Artemis when you transmit the corresponding numbers
-TERRAIN_TYPES = {
-	"Sector":						0,		
-	"Nebula":			   			1,		
-	"Minefield":					2,		
-	"Asteroid Belt":				3,		
-	"Black Hole Nursery":   		4,		
-	"Wildlands":					5,		
-	"Crossroads":		   			6,		
-}
-
 ## game state structure needed by this module:
 # game
 #	-_lock
@@ -89,8 +79,10 @@ def get_map():
 def get_turn_status():
 	"Returns the turn dict with the seconds remaining as float"
 	with game._lock:
+		c = game.countdown
+		print(c)
 		turn = copy.deepcopy(game.turn)
-		turn["remaining"] = game.coutdown.get_remaining()
+		turn["remaining"] = c.get_remaining()
 		return turn
 
 def get_ships():

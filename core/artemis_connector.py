@@ -58,6 +58,18 @@ PACKAGE_SUBTYPES = {
 				0x0b00:	"Data-Turn-Over",
 				0x0d00:	"Data-Ship-Name",
 }
+
+TERRAIN_TYPES = {
+	"Sector":						0,		
+	"Nebula":			   			1,		
+	"Minefield":					2,		
+	"Asteroid Belt":				3,		
+	"Black Hole Nursery":   		4,		
+	"Wildlands":					5,		
+	"Crossroads":		   			6,		
+}
+
+
 PACKAGE_SUBTYPES_ENCODE = dict()
 for key in PACKAGE_SUBTYPES:
 	PACKAGE_SUBTYPES_ENCODE[PACKAGE_SUBTYPES[key]] = key
@@ -298,7 +310,7 @@ def compose_map_col(index, column_data):
 		sector = struct.pack("<bbbHbbH", sector_data["rear_bases"],
 							 sector_data["forward_bases"], sector_data["fire_bases"],
 							 sector_data["enemies"], sector_data["hidden"],
-							 sector_data["terrain"], len(sector_data["name"])) + bytes(sector_data["name"], "utf-8")
+							 TERRAIN_TYPES.get(sector_data["terrain"],0), len(sector_data["name"])) + bytes(sector_data["name"], "utf-8")
 		sectors += sector
 	return sectors
 
@@ -309,7 +321,7 @@ def compose_sector(sector_data):
 								 sector_data["rear_bases"], sector_data["forward_bases"],
 								 sector_data["fire_bases"], sector_data["unknown"],
 								 sector_data["seed"], sector_data["id"],
-								 sector_data["difficulty"], sector_data["terrain"])
+								 sector_data["difficulty"], TERRAIN_TYPES.get(sector_data["terrain"], 0))
 
 def compose_ships(ships):
 	"""creates a list of ship descriptions"""
