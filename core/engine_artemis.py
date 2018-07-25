@@ -11,9 +11,6 @@ __version__ = 1.2
 import copy
 from core.game_state import game
 
-
-
-#not used now, but these strings are diplayed in Artemis when you transmit the corresponding numbers
 ## game state structure needed by this module:
 # game
 #	-_lock
@@ -80,20 +77,19 @@ def get_turn_status():
 	"Returns the turn dict with the seconds remaining as float"
 	with game._lock:
 		c = game.countdown
-		print(c)
 		turn = copy.deepcopy(game.turn)
-		turn["remaining"] = c.get_remaining()
+		turn["remaining"] = max(c.get_remaining(), 0)
 		return turn
 
 def get_ships():
-	with self._lock:
+	with game._lock:
 		ships = []
 		for client, c in game.artemis_clients:
 			if c.in_combat:
 				ship = (c.shipname, c.battle.x, c.battle.y)
 			else:
 				ship = (c.shipname, -1, -1)
-		ships.appens(ship)
+			ships.append(ship)
 		return ships
 	#artemis connected interaction
 	#since this code is called from artemis connector request, exceptions can be thrown.

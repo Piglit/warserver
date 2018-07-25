@@ -8,22 +8,6 @@ import copy
 """the game object is accessible from all engine modules"""
 game = Box(default_box=True)
 
-#	-turn
-#		-turn_number
-#		-max_turns
-#		-interlude(bool)
-#		-last_update
-#	-rules
-#		-fog_of_war
-#		-clients_block_sectors
-#		-clients_move_through_sectors_with_other_clients
-#		-allow_interludes
-#		-infinite_game
-#		-invasion_mode [ beachheads | random | none ]
-#		-seconds_per_turn
-#		-seconds_per_interlude
-#		-enemies_dont_go_direction == [ none | north | south | west | east ]
-
 DEFAULT_SECTOR = {
 	"gm_forbid":	False,
 	"gm_allow":		False,
@@ -44,13 +28,11 @@ DEFAULT_SECTOR = {
 }
 def init_sector(**kwargs):
 	s = copy.deepcopy(DEFAULT_SECTOR)
-	print(s)
 	for k,v in kwargs.items():
 		s[k] = v
-	print(s)
 	return s
 
-## game state structure needed by this module:
+## game state structure complete:
 # game
 #	-_lock
 #	-map[x][y]
@@ -109,9 +91,6 @@ def init_sector(**kwargs):
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
 
-
-
-
 def save_game(filename):
 	"""
 		Saves the game.
@@ -144,6 +123,5 @@ def create_game(save):
 		game.map = BoxList([[Box(init_sector(x=x,y=y), default_box=True) for y in range(8)] for x in range(8)] ,default_box=True)
 	game._lock = threading.RLock()
 	print("game object created")
-	print(game)
 	return game
 

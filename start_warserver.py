@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import argparse
-from core import game_state, engine_turns, artemis_connector
+from core import game_state, engine_turns, engine_artemis, engine_rpc, artemis_connector 
+try:
+	from core import pyro_connector
+	PYRO = True
+except ImportError:
+	PYRO = False 
 
 if __name__ == "__main__":
 
@@ -17,8 +22,11 @@ if __name__ == "__main__":
 	else:
 		print("starting warserver in headless mode")
 		engine_turns.init_turns()
-	print(game)
+	#print(game)
 	artemis_connector.start_server()
-		
+	if PYRO:
+		pyro_connector.start_server()		
+	else:
+		print("module Pyro4 not found. Running without Pyro server")
 
-
+	print("everything is up and running")

@@ -19,7 +19,7 @@ class countdown:
 			self.paused = True 
 
 	def get_remaining(self):
-		return self.seconds - (time.time() - self.started)
+		return self.seconds - (time.time() - (self.started or 0))
 
 	def get_started(self):
 		return self.started
