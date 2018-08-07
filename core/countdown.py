@@ -11,7 +11,7 @@ class countdown:
 		self.cmd = cmd
 		self.args = args
 		self.kwargs = kwargs
-		self.started = None
+		self.started = time.time() 
 		if seconds:
 			self.paused = False
 			self.start()
@@ -64,3 +64,13 @@ class countdown:
 		self.timer.cancel() #ignored
 		self.cmd(self.args, self.kwargs)
 
+	def __getstate__(self):
+		return None
+		print("redrum")
+		r = self.__dict__
+		if "timer" in r:
+			del r["timer"]
+		if "cmd" in r:
+			del r["cmd"]
+		print(r)
+		return r

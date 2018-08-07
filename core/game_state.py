@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from box import Box, BoxList
 import pickle
-import threading
+import core.picklable as picklable
 import random
 import copy
 
@@ -121,7 +121,9 @@ def create_game(save):
 		pass
 	if not game.map:
 		game.map = BoxList([[Box(init_sector(x=x,y=y), default_box=True) for y in range(8)] for x in range(8)] ,default_box=True)
-	game._lock = threading.RLock()
+	game._lock = picklable.RLock()
+	if not game.rules:
+		game.rules = Box({}, default_box=True)
 	print("game object created")
 	return game
 

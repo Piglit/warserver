@@ -8,6 +8,7 @@ import threading
 import itertools
 import functools
 import string
+import json
 
 #ideas:
 #sector map frames get focus by mouseover, change relief
@@ -158,26 +159,26 @@ class Sector:
 		return self.variables[item]	#raises key error
 		
 	def update(self, sector):
-		self.hidden = sector["Hidden"]
+		self.hidden = sector["hidden"]
 		self.fog = sector["fog"] and not allow_privilege("gm")
 		if not self.hidden:	
 			for key in self.variables:
 				if key in sector:
 					self.variables[key].set(sector[key])
 			self["Coordinates"].set(chr(self.x+ord('A'))+" "+str(self.y+1))
-			self["Terrain_string"].set(terrain_types[sector["Terrain"]])
-			self["Difficulty"].set(sector["Difficulty_mod"]+state["settings"]["game difficulty level"])
-			if sector["Beachhead"]:
+			self["Terrain_string"].set(sector["terrain"])
+			self["Difficulty"].set(sector["difficulty"])
+			if sector["beachhead_weight"]:
 				self["Beachhead_mark"].set("Invasion Beachhead")
 			else:
 				self["Beachhead_mark"].set("")
-			if sector["Rear_Bases"] + sector["Forward_Bases"] + sector["Fire_Bases"] > 0 and not self.fog:
-				self["Bases_short"].set(str(sector["Rear_Bases"])+"/"+str(sector["Forward_Bases"])+"/"+str(sector["Fire_Bases"]))
+			if sector["rear_bases"] + sector["forward_bases"] + sector["fire_bases"] > 0 and not self.fog:
+				self["Bases_short"].set(str(sector["rear_bases"])+"/"+str(sector["forward_bases"])+"/"+str(sector["fire_bases"]))
 			else:
 				self["Bases_short"].set("")
-			if sector["Enemies"] > 0 and not self.fog:
-				self["Enemies_short"].set("Inv " + str(sector["Enemies"]))
-				self["Difficulty_short"].set("D " + str(sector["Difficulty_mod"]+state["settings"]["game difficulty level"]))
+			if sector["enemies"] > 0 and not self.fog:
+				self["Enemies_short"].set("Inv " + str(sector["enemies"]))
+				self["Difficulty_short"].set("D " + str(sector["difficulty"]))
 			else:
 				self["Enemies_short"].set("")
 				self["Difficulty_short"].set("")
@@ -190,11 +191,11 @@ class Sector:
 			color = "#000033"
 		elif sector["fog"]:
 			color="grey"
-		elif sector["Hidden"]:
+		elif sector["hidden"]:
 			color="black"
-		elif sector["Enemies"] <= 0:
+		elif sector["enemies"] <= 0:
 			color="#003300"
-		elif sector["Rear_Bases"] + sector["Forward_Bases"] + sector["Fire_Bases"] > 0:
+		elif sector["rear_bases"] + sector["forward_bases"] + sector["fire_bases"] > 0:
 			color="#330000"	
 		else:
 			color="#333300"	
@@ -256,17 +257,17 @@ class Sector:
 				m.add_separator()
 			ac = TK.Menu(m, tearoff=False)
 			m.add_cascade(label = "Set Accessability", menu = ac)
-			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.change_sector, self.x, self.y, "Hidden", not state["map"][self.x][self.y]["Hidden"]))
-			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.change_sector, self.x, self.y, "fog", not state["map"][self.x][self.y]["fog"]))
+			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".hidden", not state["map"][self.x][self.y]["hidden"]))
+			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".fog", not state["map"][self.x][self.y]["fog"]))
 			terrain = TK.Menu(m, tearoff=False)
 			m.add_cascade(label="Set Terrain", menu = terrain)
 			for key in terrain_types:
-				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.change_sector, self.x, self.y, "Terrain", terrain_types[key]))
-			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Enemies"), "Enemies"))
-			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.change_sector, self.x, self.y, "Difficulty_mod"), "Difficulty"))
+				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.set, "game.map." + str(self.x) + "." + str(self.y) + ".terrain", terrain_types[key]))
+			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".enemies"), "Enemies"))
+			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".difficulty"), "Difficulty"))
 			m.add_command(label="Add Beachhead",	command=functools.partial (game.add_beachhead, self.x, self.y))
 			m.add_command(label="Remove Beachhead",	command=functools.partial (game.remove_beachhead, self.x, self.y))
-			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.change_sector, self.x, self.y, "Name"), "Sector Name"))
+			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".name"), "Sector Name"))
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -399,19 +400,17 @@ class Clock(TK.StringVar):
 
 	def set(self, seconds):
 		"""accepts evert type, StringVar accepts. only float gets converted and counted down"""
-		if type(seconds) == float:
-			if self.countdown:
-				self.seconds = seconds
-			prefix=""
-			if seconds < 0:
-				seconds = -seconds
-				prefix = "-"
-			if seconds > 3600:
-				seconds = time.strftime(prefix+"%H:%M:%S",time.gmtime(seconds))
-			else:
-				seconds = time.strftime(prefix+"%M:%S",time.gmtime(seconds))
+		seconds = float(seconds)
+		if self.countdown:
+			self.seconds = seconds
+		prefix=""
+		if seconds < 0:
+			seconds = -seconds
+			prefix = "-"
+		if seconds > 3600:
+			seconds = time.strftime(prefix+"%H:%M:%S",time.gmtime(seconds))
 		else:
-			print("Warning: setting clock object not to float!")
+			seconds = time.strftime(prefix+"%M:%S",time.gmtime(seconds))
 		TK.StringVar.set(self, seconds)
 		
 	def decrease(self, dt):
@@ -647,8 +646,8 @@ def update():
 		force_update.clear()
 		time_called_for_update = time.time()
 		try:
-			updates = game.get_game_state()#state["last_update"])
-			print(updates)
+			updates = json.loads(game.get_game_state())#state["last_update"])
+			#print(updates)
 		except:
 			print("connnection lost")
 			raise
@@ -660,23 +659,22 @@ def update():
 		state.update(updates)
 		status_variable.set("connected to WarServer (IP: "+ str(game.get_ip()) +")")
 		
-
 		if "turn" in updates:
 			turn_numbers.set(str(state["turn"]["turn_number"])+" / "+str(state["turn"]["max_turns"]))
 
 			if state["turn"]["interlude"]:
 				turn_string.set("Interlude")
-				maxtime = state["settings"]["minutes between turns (interlude)"]*60
+				maxtime = state["rules"].get("seconds_per_interlude", 60*60)
 			else:
 				turn_string.set("")
-				maxtime = state["settings"]["minutes per turn"]*60
+				maxtime = state["rules"].get("seconds_per_turn", 60*60)
 			turn_max_time.set(maxtime)
 			time_remain = state["turn"]["remaining"]-time_latency
 			time_updated_clock = time.time()
 			turn_time.set(time_remain)
-			time_war = (state["turn"]["max_turns"] - state["turn"]["turn_number"]) * (state["settings"]["minutes per turn"] + state["settings"]["minutes between turns (interlude)"])*60
+			time_war = (state["turn"]["max_turns"] - state["turn"]["turn_number"]) * (state["rules"].get("seconds_per_turn", 60*60) + state["rules"].get("seconds_per_interlude", 60*60))
 			if state["turn"]["interlude"]:
-				time_war += state["settings"]["minutes per turn"]*60
+				time_war += state["rules"].get("seconds_per_turn", 60*60)
 			time_war += time_remain  
 			turn_war_time.set(time_war)
 
