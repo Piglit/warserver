@@ -1,6 +1,6 @@
 
 from core.game_state import game
-
+import copy
 ## game state structure that needs special handling:
 # game
 #	-_lock
@@ -14,8 +14,15 @@ class rpc:
 	def __init__(self):
 		pass
 
+	def ping(self):
+		return True
+
 	def get_game_state(self):
-		game_state = game.to_json()
+		print("get")
+		game_state = copy.deepcopy(game)
+		del game_state["_lock"]
+		print("got")
+		game_state = game_state.to_json()
 		return game_state
 
 	def get(self, path):
