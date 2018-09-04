@@ -5,6 +5,7 @@ from core.engine_rpc import rpc
 import threading
 import socket
 import core.engine_rpc
+from time import sleep
 
 @Pyro4.expose
 class pyro_rpc(rpc):
@@ -67,7 +68,14 @@ def get_ip():
 def get_pyro_nameserver(ip):
 	"""we assume there is no pyro nameserver in the network."""
 	threading.Thread(target=Pyro4.naming.startNSloop, kwargs={"host": ip}).start()
-	nameserver = Pyro4.locateNS(host=ip)
+	nameserver = False
+	failcount = 0
+	while not nameserver and failcount < 3:
+		try:
+			nameserver = Pyro4.locateNS(host=ip)
+		except Pyro4.errors.NamingError:
+			sleep(0.1)
+			failcount += 1
 	nameserver.ping()
 	return nameserver
 

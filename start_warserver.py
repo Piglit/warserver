@@ -22,7 +22,7 @@ if __name__ == "__main__":
 		client.startmenu.start(game)
 	else:
 		print("starting warserver in headless mode")
-		engine_turns.init_turns()
+		engine_turns.start_default_game()
 	#print(game)
 	artemis_connector.start_server()
 	if PYRO:

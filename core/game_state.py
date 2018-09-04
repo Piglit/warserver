@@ -24,7 +24,7 @@ DEFAULT_SECTOR = {
 	"unknown":	0,
 	"name":	"",
 	"pending_invaders":	0,
-	"beachhead_weight":	1,
+	"beachhead_weight":	0,
 }
 def init_sector(**kwargs):
 	s = copy.deepcopy(DEFAULT_SECTOR)
@@ -44,6 +44,7 @@ def init_sector(**kwargs):
 #			-hinder_movement
 #			-x
 #			-y
+#			-coordinates(printable)
 #			-difficulty
 #			-enemies
 #			-rear_bases
@@ -87,6 +88,7 @@ def init_sector(**kwargs):
 #		-allow_interludes
 #		-infinite_game
 #		-invasion_mode [ beachheads | random | none ]
+#		-invaders_per_turn
 #		-seconds_per_turn
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
@@ -119,11 +121,38 @@ def create_game(save):
 			game.update(Box(yaml.load(save), default_box=True))
 	else:
 		pass
-	if not game.map:
-		game.map = BoxList([[Box(init_sector(x=x,y=y), default_box=True) for y in range(8)] for x in range(8)] ,default_box=True)
 	game._lock = picklable.RLock()
+	if not game.map:
+		game.map = Box()
+		for x in range(8):
+			game.map[x] = Box()
+			for y in range(8):
+				printable_coordinates = str(chr(ord("A")+x)) + str(y+1)
+				game.map[x][y] = Box(init_sector(x=x, y=y, coordinates=printable_coordinates))
+
 	if not game.rules:
+		#Test mode
 		game.rules = Box({}, default_box=True)
+		game.rules.fog_of_war = False
+		game.rules.clients_block_sectors = True
+		game.rules.clients_move_through_sectors_with_other_clients = False
+		game.rules.allow_interludes = True
+		game.rules.infinite_game = False
+		game.rules.invasion_mode = "beachheads"
+		game.rules.invaders_per_turn = 20
+		game.rules.seconds_per_turn = 120
+		game.rules.seconds_per_interlude = 30
+		game.rules.enemies_dont_go_direction = "none"
+		game.map[4][0].beachhead_weight = 1.0
+	if not game.turn:
+		game.turn = Box(default_box=True)
+		game.turn.turn_number = 1
+		game.turn.interlude = False
+		game.turn.max_turns = 10 
+	if not game.admiral:
+		game.admiral = Box({}, default_box=True)
+		game.admiral.strategy_points = 0
+
 	print("game object created")
 	return game
 

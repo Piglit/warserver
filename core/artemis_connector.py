@@ -79,6 +79,9 @@ CONNECTIONS_LOCK = threading.RLock()
 MAP_CHANGED_EVENT = threading.Event()
 
 
+def log(msg):
+	print(time.asctime() + " Connection " + str(msg))
+
 def heartbeat(ip, port):
 	"""
 	This function is executed by each heartbeat-thread.
@@ -91,9 +94,12 @@ def heartbeat(ip, port):
 		socket = con["socket"]			#reference
 		connection_number = con["connection_number"]	#copy
 		terminate = con["terminate"]	#reference
+		#active = con["active"]			#reference
+	#from this point on the thread is initialized and does not read the connections state anymore.
 	while not terminate.wait(timeout=0.5):	#sleeps for 0.5 sec before returning False.
 		heartbeat_number = (heartbeat_number + 1) % 16**4
 		socket.sendto(compose_heartbeat(connection_number, heartbeat_number), client)
+		#active.wait()
 	socket.close()
 
 def notify():
@@ -122,30 +128,31 @@ def notify():
 
 		with CONNECTIONS_LOCK:
 			for client in CONNECTIONS:
-				socket = CONNECTIONS[client]["socket"]
-				#updates = engine.get_modified_map(client)
-				#updated_cols = {}
-				for package in unfinished_packages:
-					try:
-						socket.sendto(compose_data(client, package), client)
-					except Exception as exception:
-						print(exception)
-				#for x, y, k, v in sorted(updates):
-				#	if x not in updated_cols:
-				#		updated_cols[x] = copy.deepcopy(game_map[x])
-				#	if isinstance(v, (int, float)):
-				#		updated_cols[x][y][k] += v
-				#	else:
-				#		updated_cols[x][y][k] = v
+#				if CONNECTIONS[client]["active"].is_set():
+					socket = CONNECTIONS[client]["socket"]
+					#updates = engine.get_modified_map(client)
+					#updated_cols = {}
+					for package in unfinished_packages:
+						try:
+							socket.sendto(compose_data(client, package), client)
+						except Exception as exception:
+							print(exception)
+					#for x, y, k, v in sorted(updates):
+					#	if x not in updated_cols:
+					#		updated_cols[x] = copy.deepcopy(game_map[x])
+					#	if isinstance(v, (int, float)):
+					#		updated_cols[x][y][k] += v
+					#	else:
+					#		updated_cols[x][y][k] = v
 
-				for i in range(8):
-					try:
-						#if i in updated_cols:
-						#	socket.sendto(compose_data(client, compose_map_col(i, updated_cols[i])), client)
-						#else:
-							socket.sendto(compose_data(client, orig_map_col[i]), client)
-					except Exception as exception:
-						print(exception)
+					for i in range(8):
+						try:
+							#if i in updated_cols:
+							#	socket.sendto(compose_data(client, compose_map_col(i, updated_cols[i])), client)
+							#else:
+								socket.sendto(compose_data(client, orig_map_col[i]), client)
+						except Exception as exception:
+							print(exception)
 
 
 
@@ -155,30 +162,35 @@ def register_connection(client, socket, connection_number):
 	The thread and the information it communicates with us are stored
 	in the global CONNECTIONS dict.
 	Each client-port combination may only be connected onec at the same time.
+	Notice that a client can send more than one connection request over time.
 	"""
 	connection = dict()
+	already_exists = False
 	with CONNECTIONS_LOCK:
 		if client in CONNECTIONS:
 			connection = CONNECTIONS[client]
+			already_exists = True 
+			#connection["active"].set() # not used
+			return connection["connection_number"], connection["thread"]
 		else:
 			CONNECTIONS[client] = connection
-
 	if connection_number is None:
 		connection_number = 0
-	else:
-		#FIXME experimental, not tested yet
-		connection_number += 1
 	connection["connection_number"] = connection_number
 	connection["data_number"] = 1
 	connection["last_sector_numbers"] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-	connection["terminate"] = threading.Event()
+	connection["terminate"] = threading.Event()		#terminate is currently not used!
+	connection["active"] = threading.Event()
 	connection["socket"] = socket.dup()
 	thread = threading.Thread(target=heartbeat, args=(client))
 	connection["thread"] = thread
+	#connection["active"].set()
+
 	return connection_number, thread
 
 def unregister_connection(client):
 	"""A Client disconedted from the server"""
+	log("from " + str(client) + " unregistered.")
 	with CONNECTIONS_LOCK:
 		if client in CONNECTIONS:
 			con = CONNECTIONS.pop(client)
@@ -221,13 +233,17 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 		for package in dissect(data):
 			if package["type"] == "Client-hello":
 				number, thread = register_connection(client, socket, package.get("connection_number"))
+				log("("+str(number)+") from " + str(client) + " registered.")
 				socket.sendto(compose_hello(number, package), client)
-				thread.start()
+				if not thread.is_alive():
+					thread.start()
 				MAP_CHANGED_EVENT.set()
-			if package["type"] == "Error":
+			elif package["type"] == "Error":
+				log("from "+str(client)+" reported Error")
 				unregister_connection(client)
 			elif client in CONNECTIONS:	#no lock
 				if package["type"] == "Client-bye":
+					log("from "+str(client)+" sent disconnect.")
 					socket.sendto(ack("Heartbeat-Ack", package), client)
 					unregister_connection(client)
 				elif package["type"] == "Heartbeat" or package["type"] == "?+Heartbeat":
@@ -249,6 +265,10 @@ class ArtemisUDPHandler(socketserver.DatagramRequestHandler):
 					elif package["subtype"] == "Sector-Kill":
 						if check_sector_replay(client, package["Number"]):
 							engine.kills_in_sector(package["Ship-Name"], package["ID"], package["Kills"], client)
+					else:
+						warn("unknown sector package")
+				else:
+					warn("unknown package")
 			else:
 				warn("client not in CONNECTIONS list. Waiting for client to reconnect.")
 
@@ -285,11 +305,13 @@ def compose_heartbeat(con_number, pack_number):
 
 def compose_hello(number, orig_package):
 	"""called when a client connects to the server"""
+	number_orig = number
 	preamble = compose_preamble(number, True, "Server-hello", 1)
 	number = number % 8
 	number = number | number << 4
 	payload = struct.pack('>'+('H'*20), 0x0000, number, 0x0000, *orig_package["payload-1-echo"],
 						  0, 0, 0, 0, *orig_package["payload-3-echo"])
+	#print("HELLO: number:"+str(number_orig)+", True, 1, 0x0000, number:"+str(number)+", 0x0000, payload-1, 0, 0, 0, 0, payload-3")
 	return preamble + payload
 
 def compose_data(client, payload):
@@ -310,13 +332,16 @@ def compose_map_col(index, column_data):
 		sector = struct.pack("<bbbHbbH", sector_data["rear_bases"],
 							 sector_data["forward_bases"], sector_data["fire_bases"],
 							 sector_data["enemies"], sector_data["hidden"],
-							 TERRAIN_TYPES.get(sector_data["terrain"],0), len(sector_data["name"])) + bytes(sector_data["name"], "utf-8")
+							 TERRAIN_TYPES.get(sector_data["terrain"],0),
+							 len(sector_data["name"])
+							 ) + bytes(sector_data["name"], "utf-8")
 		sectors += sector
 	return sectors
 
 def compose_sector(sector_data):
 	"""creates a sector for a client to play"""
 	subtype = struct.pack(">H", PACKAGE_SUBTYPES_ENCODE["Data-Sector"])
+	print("SECTOR: " +str(sector_data))
 	return subtype + struct.pack("<HbbbbHxxHxxbxxxb", sector_data["enemies"],
 								 sector_data["rear_bases"], sector_data["forward_bases"],
 								 sector_data["fire_bases"], sector_data["unknown"],
@@ -327,8 +352,7 @@ def compose_ships(ships):
 	"""creates a list of ship descriptions"""
 	#ship: (shipname, x, y)
 	package = struct.pack(">H", PACKAGE_SUBTYPES_ENCODE["Data-Ships"])
-	for s in ships:
-		ship = ships[s]
+	for ship in ships:
 		package += struct.pack("<bbbH", 1, ship[1], ship[2], len(ship[0]))
 		package += bytes(ship[0], "utf-8")
 	package += struct.pack(">b", 0)
@@ -404,6 +428,8 @@ def dissect(data):
 			if int.from_bytes(data[40:], byteorder="big") != 0:
 				raise ValueError
 			#Dont know what all this means yet.
+			#print("PREAMBLE: {flags_time: " + str(hex(preamble["flags_time"])) +", flags_connection_number" + str(hex(preamble["flags_connection_number"])) + ", flags_unknown:" + str(hex(preamble["flags_unknown"])) + ", preamble_time: " + str(preamble.get("time")) +"}" )
+			#print("PACKAGE: " + str(package))
 			data = []
 		elif subtype == "Client-bye":
 			if int.from_bytes(data[0:], byteorder="big") != 0:
@@ -445,7 +471,8 @@ def dissect(data):
 				data = data[8:]
 			else:
 				warn("WTF?")
-			strlen = int.from_bytes(data[0:2], byteorder="big")
+			strlen = int.from_bytes(data[0:2], byteorder="little")
+			#print("Ship-Name ("+str(strlen)+"): " + str(data[2:strlen+2]))
 			package["Ship-Name"] = data[2:strlen+2].decode(encoding="utf-8")
 			data = data[strlen+2:]
 		package.update(preamble)

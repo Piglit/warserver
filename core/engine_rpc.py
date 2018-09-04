@@ -68,9 +68,9 @@ class rpc:
 				target = None
 				break
 		if items[-1] not in target:
-			return False
+			raise AttributeError(path)
 		if instanceof(target[items[-1]]) != instanceof(value):
-			return False
+			raise TypeError(value)
 		target[items[-1]] = value
 		return True
 			
@@ -85,9 +85,9 @@ class rpc:
 				target = None
 				break
 		if items[-1] not in target:
-			return False
+			raise AttributeError
 		if instanceof(target[items[-1]]) != instanceof(value):
-			return False
+			raise AttributeError
 		target[items[-1]] += value
 		return True
 

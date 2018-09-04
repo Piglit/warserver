@@ -257,17 +257,17 @@ class Sector:
 				m.add_separator()
 			ac = TK.Menu(m, tearoff=False)
 			m.add_cascade(label = "Set Accessability", menu = ac)
-			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".hidden", not state["map"][self.x][self.y]["hidden"]))
-			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".fog", not state["map"][self.x][self.y]["fog"]))
+			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".hidden", not state["map"][self.x][self.y]["hidden"]))
+			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".fog", not state["map"][self.x][self.y]["fog"]))
 			terrain = TK.Menu(m, tearoff=False)
 			m.add_cascade(label="Set Terrain", menu = terrain)
 			for key in terrain_types:
-				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.set, "game.map." + str(self.x) + "." + str(self.y) + ".terrain", terrain_types[key]))
-			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".enemies"), "Enemies"))
-			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".difficulty"), "Difficulty"))
+				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".terrain", terrain_types[key]))
+			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".enemies"), "Enemies"))
+			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".difficulty"), "Difficulty"))
 			m.add_command(label="Add Beachhead",	command=functools.partial (game.add_beachhead, self.x, self.y))
 			m.add_command(label="Remove Beachhead",	command=functools.partial (game.remove_beachhead, self.x, self.y))
-			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".name"), "Sector Name"))
+			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".name"), "Sector Name"))
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -647,6 +647,13 @@ def update():
 		time_called_for_update = time.time()
 		try:
 			updates = json.loads(game.get_game_state())#state["last_update"])
+			if "map" in updates:
+				corrected_map = []
+				for x, col in updates["map"].items():
+					corrected_map.append([])
+					for y, sector in col.items():
+						corrected_map[int(x)].append(sector)
+				updates["map"] = corrected_map
 			#print(updates)
 		except:
 			print("connnection lost")

@@ -5,6 +5,7 @@ Here the map and the game state is represented.
 Other modules communicate with this module to read and to write the game state.
 """
 
+import time
 from box import Box
 from core.game_state import game
 from core.countdown import countdown
@@ -28,9 +29,10 @@ from core.countdown import countdown
 #	-countdown
 #		-get_remaining()
 #	-rules
-#		-no_interludes
+#		-allow_interludes
 #		-infinite_game
 #		-invasion_mode [ beachheads | random | none ]
+#		-invaders_per_turn
 #		-seconds_per_turn
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
@@ -38,22 +40,31 @@ from core.countdown import countdown
 __author__ = "Pithlit"
 __version__ = 1.0
 
-def init_turns(skip_turns=6):
-	if not game.turn:
-		game.turn = Box(default_box=True)
-	if not game.turn.turn_number:
-		game.turn.turn_number = 1
-		game.turn.interlude = False
-	if not game.turn.max_turns:
-		game.turn.max_turns = 10 
-	for i in range(skip_turns):
+def start():
+	if not game.countdown:
+		game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
+		defeat_bases()
 		enemies_proceed()
 		enemies_spawn()
+
+def start_default_game():
+	start()
+	enemies_spawn()
+	enemies_proceed()
+	enemies_spawn()
+	enemies_proceed()
+	enemies_spawn()
+	enemies_proceed()
+	enemies_spawn()
+	enemies_proceed()
+	enemies_spawn()
 	defeat_bases()
-	game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
+	enemies_proceed()
+	
 
 def proceed_turn():
 	"""proceeds to the next turn"""
+	print("next turn")
 	with game._lock:
 		game.countdown.cancel()	#ignored if this is executed by the timer_thread itself
 		turn = game.turn
@@ -68,7 +79,7 @@ def proceed_turn():
 			enemies_spawn()
 			engine_artemis.release_all_ships()
 			turn.turn_number += 1
-			if game.rules.no_interludes:
+			if not game.rules.allow_interludes:
 				game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
 			else:
 				turn.interlude = True
@@ -84,8 +95,8 @@ def defeat_bases():
 	so you can see what happens without modifying the actual map.
 	"""
 	with game._lock:
-		for column in game.map:	
-			for sector in column:
+		for column in game.map.values():	
+			for sector in column.values():
 				if sector["enemies"] > 0:
 					sector["rear_bases"] = 0
 					sector["forward_bases"] = 0
@@ -103,23 +114,31 @@ def enemies_spawn():
 		if game.rules.invasion_mode == "beachheads":
 			invading_sectors = []
 			sum_weights = 0
-			for column in game.map:	
-				for sector in column:
+			for column in game.map.values():	
+				for sector in column.values():
 					weight = sector.get("beachhead_weight")
-					if weight and weight > 0:
+					if weight and weight > 0.0:
 						invading_sectors.append((weight, sector))
 						sum_weights += weight
-			enemies = game.rules["invaders_per_turn"] // sum_weights
-			plus_one = game.rules["invaders_per_turn"] % sum_weights 
-			for w, s in invading_sectors:
-				sector["enemies"] += enemies
-				if plus_one > 0:
-					sector["enemies"] += 1
-					plus_one -= 1
+						#print("DBG: "+ str(sector))
+			if sum_weights > 0:
+				remaining_enemies = game.rules["invaders_per_turn"]
+				enemies_per_weight = int(game.rules["invaders_per_turn"] // sum_weights)
+				for w, sector in invading_sectors:
+					enemies = int(enemies_per_weight * w)
+					sector["enemies"] += enemies 
+					remaining_enemies -= enemies
+				while remaining_enemies > 0: 
+					for w, sector in sorted(invading_sectors):
+						if remaining_enemies > 0:
+							sector["enemies"] += 1
+							remaining_enemies -= 1
+						else:
+							break
 		elif game.rules.invasion_mode == "random":
 			invading_sectors = []
-			for column in game.map:	
-				for sector in column:
+			for column in game.map.values():	
+				for sector in column.values():
 					if sector["enemies"] > 0:
 						invading_sectors.append(sector)
 			for e in range(game.rules["invaders_per_turn"]):
@@ -143,7 +162,7 @@ def enemies_proceed():
 				neighbours = _adjacent_for_enemies(col, row)
 				if len(neighbours) == 0:
 					continue
-				enemies = sector.get("enemies",0) // len(neighbours)
+				enemies = int(sector.get("enemies",0) // len(neighbours))
 				for s in neighbours:
 					s["pending_invaders"] += enemies
 				sector["enemies"] -= enemies
