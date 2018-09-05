@@ -22,29 +22,40 @@ class pyro_rpc(rpc):
 		return rpc.get_game_state(self)
 
 	def get(self, path):
+		print("get"+str(path))
 		return rpc.get(self, path)
 	
 	def set(self, path, value):
+		print("set", path, value)
 		return rpc.set(self, path, value)
 
 	def modify(self, path, value):
+		print("modify", path, value)
 		return rpc.modify(self, path, value)
 
 	def place_base(self,x,y,base_value):
+		print("place_base", x,y,base_value)
 		return rpc.place_base(self,x,y,base_value)
 
 	def end_turn(self):
+		print("end_turn")
 		return rpc.end_turn(self)
 
 	def change_turn_time_remaining(self,seconds):
+		print("change_turn_time_remaining",seconds)
 		return rpc.change_turn_time_remaining(self,seconds)
 
 	def add_beachhead(self,x,y):
+		print("add_beachhead",x,y)
 		return rpc.add_beachhead(self,x,y)
 
 	def remove_beachhead(self,x,y):
+		print("remove_beachhead",x,y)
 		return rpc.remove_beachhead(self,x,y)
 
+	def save_game(self):
+		print("save_game")
+		return rpc.save_game(self)
 
 def get_ip():
 	"""* 

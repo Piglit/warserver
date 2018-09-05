@@ -257,17 +257,17 @@ class Sector:
 				m.add_separator()
 			ac = TK.Menu(m, tearoff=False)
 			m.add_cascade(label = "Set Accessability", menu = ac)
-			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".hidden", not state["map"][self.x][self.y]["hidden"]))
-			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".fog", not state["map"][self.x][self.y]["fog"]))
+			ac.add_command(label="Toggle Empty Sector",	command=functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".hidden", not state["map"][self.x][self.y]["hidden"]))
+			ac.add_command(label="Toggle Fog of War",	command=functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".fog", not state["map"][self.x][self.y]["fog"]))
 			terrain = TK.Menu(m, tearoff=False)
 			m.add_cascade(label="Set Terrain", menu = terrain)
 			for key in terrain_types:
-				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".terrain", terrain_types[key]))
-			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".enemies"), "Enemies"))
-			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".difficulty"), "Difficulty"))
+				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.set, "game.map." + str(self.x) + "." + str(self.y) + ".terrain", terrain_types[key]))
+			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".enemies"), "Enemies"))
+			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".difficulty"), "Difficulty"))
 			m.add_command(label="Add Beachhead",	command=functools.partial (game.add_beachhead, self.x, self.y))
 			m.add_command(label="Remove Beachhead",	command=functools.partial (game.remove_beachhead, self.x, self.y))
-			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.set, "game.map.x" + str(self.x) + ".x" + str(self.y) + ".name"), "Sector Name"))
+			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".name"), "Sector Name"))
 
 class SectorMapFrame(TK.Frame):
 	"""This is a sector on the map frame, owned by a Sector object"""
@@ -503,15 +503,15 @@ def turn_menu(event):
 	if allow_privilege("gm"):
 		m.add_command(label="Save Game", command= functools.partial (game.save_game, "gm-save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+"_turn_"+str(state["turn"]["turn_number"])+".sav"))
 		m.add_command(label="End Turn", command= functools.partial (game.end_turn))
-		m.add_command(label="Change Turn Number", command= functools.partial (change_integer_dialog, game.change_turn_number, "Turn Number"))
-		m.add_command(label="Change Total Turns", command= functools.partial (change_integer_dialog, game.change_max_turns, "Total Turns"))
-		m.add_command(label="Change Remaining Time", command= functools.partial (change_integer_dialog, game.change_turn_time_remaining, "Seconds Remaining"))
-		m.add_command(label="Change Base Points", command= functools.partial (change_integer_dialog, game.change_base_points, "Base Points"))
-		m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))
-		m.add_command(label="Change global Difficulty", command= functools.partial (change_integer_dialog, functools.partial(game.change_setting, "game difficulty level"), "global Difficulty"))
-		m.add_command(label="Change Invaders Per Turn", command= functools.partial (change_integer_dialog, functools.partial(game.change_setting, "invaders per turn"), "Invaders per turn"))
-		m.add_command(label="Change Minutes Per Turn", command= functools.partial (change_float_dialog, functools.partial(game.change_setting, "minutes per turn"), "Minutes per turn"))
-		m.add_command(label="Change Minutes between Turns", command= functools.partial (change_float_dialog, functools.partial(game.change_setting, "minutes between turns (interlude)"), "Minutes between turns"))
+		m.add_command(label="Change Turn Number", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.turn_number"), "Turn Number"))
+		m.add_command(label="Change Total Turns", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "trun.max_turns"), "Total Turns"))
+	#	m.add_command(label="Change Remaining Time", command= functools.partial (change_integer_dialog, functools.partial(game.change_turn_time_remaining), "Seconds Remaining"))
+		m.add_command(label="Change Base Points", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "admiral.strategy_points") , "Strategy Points"))
+	#	m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))
+	#	m.add_command(label="Change global Difficulty", command= functools.partial (change_integer_dialog, functools.partial(game.change_setting, "game difficulty level"), "global Difficulty"))
+		m.add_command(label="Change Invaders Per Turn", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "rules.invaders_per_turn"), "Invaders per turn"))
+		m.add_command(label="Change Minutes Per Turn", command= functools.partial (change_float_dialog, functools.partial(game.modify, "rules.seconds_per_turn"), "Seconds per turn"))
+		m.add_command(label="Change Minutes between Turns", command= functools.partial (change_float_dialog, functools.partial(game.modify, "seconds_per_interlude"), "Seconds between turns"))
 
 def score_menu(event):
 	if allow_privilege("admiral"):
