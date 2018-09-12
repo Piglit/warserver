@@ -92,6 +92,14 @@ def init_sector(**kwargs):
 #		-seconds_per_turn
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
+#	-_notifications(list)
+
+def updated(*args):
+	"""something (given in args) has changed. Notifications are sent"""
+	with game._lock:
+		for event in game._notifications:
+			event.set()
+
 
 def save_game(filename):
 	"""
@@ -128,7 +136,8 @@ def create_game(save):
 			game.map[x] = Box()
 			for y in range(8):
 				printable_coordinates = str(chr(ord("A")+x)) + str(y+1)
-				game.map[x][y] = Box(init_sector(x=x, y=y, coordinates=printable_coordinates))
+				terrain = random.choice(["Sector","Nebula","Minefield","Asteroid Belt","Black Hole Nursery","Wildlands","Crossroads"])
+				game.map[x][y] = Box(init_sector(x=x, y=y, coordinates=printable_coordinates, seed=random.randrange(0x7fff*2), terrain=terrain))
 
 	if not game.rules:
 		#Test mode

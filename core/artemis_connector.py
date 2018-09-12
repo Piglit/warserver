@@ -194,6 +194,7 @@ def unregister_connection(client):
 	with CONNECTIONS_LOCK:
 		if client in CONNECTIONS:
 			con = CONNECTIONS.pop(client)
+			engine.disconnect_client(client)
 		else:
 			return
 	con["terminate"].set()
@@ -486,7 +487,7 @@ SERVER = socketserver.UDPServer((HOST, PORT), ArtemisUDPHandler)	#Blocking.
 
 def start_server():
 	"""initializes and start this module"""
-	#engine.register_notification(MAP_CHANGED_EVENT)
+	engine.register_notification(MAP_CHANGED_EVENT)
 	threading.Thread(target=notify).start()
 	threading.Thread(target=SERVER.serve_forever).start()
 	print("Server is listening for Artemis clients.")

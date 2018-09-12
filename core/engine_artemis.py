@@ -12,6 +12,7 @@ import random
 import copy
 import time
 from core.game_state import game
+from core.game_state import updated 
 
 ## game state structure needed by this module:
 # game
@@ -61,14 +62,12 @@ from core.game_state import game
 #		-fog_of_war
 #		-clients_block_sectors
 #		-clients_move_through_sectors_with_other_clients
-
-def updated(*args):
-	pass
+#	-_notifications(list)
 
 def log(msg):
 	print(time.asctime() + " Artemis Client " + msg)
 
-	# getter methods
+# getter methods
 
 def get_map():
 	"""
@@ -113,6 +112,7 @@ def _release_ship(client):
 		if not c:
 			game.artemis_clients[client] = c
 		if c.in_combat:
+			#battle is not reset because a clear package can arrive after turn release.
 			x = c.battle.x
 			y = c.battle.y
 			cs = game.map[x][y].client_inside
@@ -150,7 +150,7 @@ def _clientwall(client, sector):
 		return False
 	if _adjacent_for_artemis_clients(sector):
 		return True
-	log(str(client) + " enter request for sector " + str(sector.coordinates) + " refused (unknown reason).")
+	log(str(client) + " enter request for sector " + str(sector.coordinates) + " refused (no adjacent friendly sector).")
 	return False
 
 def _adjacent_for_artemis_clients(sector):
@@ -180,13 +180,16 @@ def _adjacent_for_artemis_clients(sector):
 	return result
 
 def _start_battle(client, sector):
+	with game._lock:
 		t = time.time()
 		c = game.artemis_clients[client]
 		c.in_combat = True
 		c.battle.id = random.randrange(16**4)
-		c.battle.seed = random.randrange(0x7fff*2)
-		x = c.battle.x = sector.x
-		y = c.battle.y = sector.y
+		c.battle.seed = sector.seed
+		c.battle.x = sector.x
+		c.battle.y = sector.y
+		x = c.battle.x
+		y = c.battle.y
 		c.battle.difficulty = max(min(int(sector.get("difficulty", 7)),11),1)
 		c.battle.enemies = int(sector.get("enemies",1))
 		c.battle.rear_bases = int(sector.get("rear_bases",0))
@@ -194,7 +197,7 @@ def _start_battle(client, sector):
 		c.battle.fire_bases = int(sector.get("fire_bases",0))
 		c.battle.terrain = sector.terrain
 		c.battle.unknown = int(sector.get("unknown",0))
-		c.log[t] = ("enter_sector",(x,y))
+		c.log[t] = ("enter_sector", sector.coordinates)
 		if not sector.client_inside:
 			sector.client_inside = set()
 		sector.client_inside.add(client)
@@ -218,37 +221,12 @@ def enter_sector(x, y, shipname, client):
 		sector = game.map[x][y]
 		game.artemis_clients[client].shipname = shipname	
 		if not _clientwall(client, sector):
-			game.artemis_clients[client].log[t] =(t,"on_map")	
+			game.artemis_clients[client].log[t] = ("on_map")	
 			updated("artemis_clients", client, "log")
-
 			return None
 		log(shipname + str(client) + " entering sector " + str(sector.coordinates) )
-		#_start_battle updates
 		return _start_battle(client, sector)
-		#changes = []
-		#c = self.events_enter_sector.get(("All-Artemis-Clients"))
-		#if c is not None:
-		#	if "any" in c:
-		#		changes += c["any"]
-		#	if (x, y) in c:
-		#		changes += c[(x, y)]
-		#c = self.events_enter_sector.get(client)
-		#if c == None:
-		#	c = self.events_enter_sector.get(client[0])
-		#if c == None:
-		#	c = self.events_enter_sector.get(shipname)
-		#if c is not None:
-		#	if "any" in c:
-		#		changes += c["any"]
-		#	if (x, y) in c:
-		#		changes += c[(x, y)]
-		#for k, v in changes:
-		#	if type(v) == int or type(v) == float:
-		#		sector[k] += v
-		#	else:
-		#		sector[k] = v
 		
-
 def kills_in_sector(shipname, id, kills, client):
 	"""
 	This is called after an Artemis client killed one or more enemies.
@@ -257,7 +235,9 @@ def kills_in_sector(shipname, id, kills, client):
 	with game._lock:
 		t = time.time()
 		c = game.artemis_clients[client]
-		assert c.in_combat
+		if not c.in_combat:
+			#too late; turn may be over or some bug occured
+			return
 		battle = c.battle
 		assert battle.id == id
 		battle.enemies -= kills
@@ -265,8 +245,8 @@ def kills_in_sector(shipname, id, kills, client):
 		sector.enemies = max(0,min(battle.enemies, sector.enemies))
 		c.log[t] = ("kills",kills)	
 		updated("artemis_clients", client)
-		updated("map",x,y)
-
+		updated("map",battle.x,battle.y)
+	log(shipname + str(client) + " killed " + str(kills) + " in " + str(sector.coordinates))
 
 def clear_sector(shipname, id, client):
 	"""
@@ -277,30 +257,37 @@ def clear_sector(shipname, id, client):
 	with game._lock:
 		t = time.time()
 		c = game.artemis_clients[client]
-		assert c.in_combat
+		package_arrived_in_interlude = False
+		if not c.in_combat:
+			if not c.battle:
+				return
+			#clear arrived after turn over: check if no enemies are left.
+			package_arrived_in_interlude = True
 		battle = c.battle
 		assert battle.id == id
-		sector = game.map[battle.x][battle.y]
+		if package_arrived_in_interlude:
+			if battle.enemies > 0:
+				return	#invalid
+		else:
+			sector = game.map[battle.x][battle.y]
+			sector.enemies = 0
 		c.log[t] = ("clear",(battle.x, battle.y))	
-		sector.enemies = 0
 		_release_ship(client)	#_release_ship updates
 		game.admiral.strategy_points += 1
 		updated("admiral")
+	log(shipname + str(client) + " cleared " + str(sector.coordinates))
 
-#			for _x, _y in game._all_neighbours(x, y):
-#				game.map[_x][_y]["fog"] = False
-#			game._map_changed()
+def disconnect_client(self, client):
+	"""When a client disconects, free the sector"""
+	_release_ship(client)
 
-	def disconnect_client(self, client):
-		"""When a client disconects, free the sector"""
-		_release_ship(client)
-
-	# varios methods
-
-def register_notification(self, event):
+def register_notification(event):
 	"""
-	The caller mat provide an event to the engine, which is set when the map changes.
+	The caller gives to the engine, which is set when the map changes.
 	The caller must clear his event himself.
 	"""
-	self._notifications.append(event)
+	with game._lock:
+		if not game._notifications:
+			game._notifications = list()
+		game._notifications.append(event)
 

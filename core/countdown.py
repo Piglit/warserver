@@ -28,6 +28,7 @@ class countdown:
 		self.started = time.time()
 		self.paused = False 
 		self.timer = threading.Timer(self.seconds, self.zero)
+		self.timer.start()
 
 	def pause(self):
 		self.timer.cancel()

@@ -8,7 +8,10 @@ Other modules communicate with this module to read and to write the game state.
 import time
 from box import Box
 from core.game_state import game
+from core.game_state import updated 
 from core.countdown import countdown
+from core import engine_artemis
+
 
 ## game state structure needed by this module:
 # game
@@ -36,9 +39,13 @@ from core.countdown import countdown
 #		-seconds_per_turn
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
+#	-_notifications(list)
 
 __author__ = "Pithlit"
 __version__ = 1.0
+
+def log(msg):
+	print(time.asctime() + " Turn " + str(msg))
 
 def start():
 	if not game.countdown:
@@ -46,6 +53,7 @@ def start():
 		defeat_bases()
 		enemies_proceed()
 		enemies_spawn()
+	updated("turn")
 
 def start_default_game():
 	start()
@@ -60,19 +68,21 @@ def start_default_game():
 	enemies_spawn()
 	defeat_bases()
 	enemies_proceed()
+	updated("turn")
 	
 
-def proceed_turn():
+def proceed_turn(*args, **kwargs):
 	"""proceeds to the next turn"""
-	print("next turn")
 	with game._lock:
 		game.countdown.cancel()	#ignored if this is executed by the timer_thread itself
 		turn = game.turn
+		logmsg = None
 		if turn["interlude"]:
 			if turn["turn_number"] <= turn["max_turns"]:
 				#turn_number starts with 1, interlude 1 comes after turn 1.
 				turn["interlude"] = False
 				game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
+				logmsg = str(turn.turn_number)
 		else:
 			defeat_bases()
 			enemies_proceed()
@@ -85,7 +95,12 @@ def proceed_turn():
 				turn.interlude = True
 				game.countdown = countdown(game.rules.seconds_per_interlude, proceed_turn)
 
+			logmsg = "interlude"
+		updated("turn")
+	if logmsg:
+		log(logmsg + " started")
 			#game.save("_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(t))+"_turn_"+str(turn["turn_number"])+".sav")
+
 
 def defeat_bases():
 	"""
@@ -120,7 +135,6 @@ def enemies_spawn():
 					if weight and weight > 0.0:
 						invading_sectors.append((weight, sector))
 						sum_weights += weight
-						#print("DBG: "+ str(sector))
 			if sum_weights > 0:
 				remaining_enemies = game.rules["invaders_per_turn"]
 				enemies_per_weight = int(game.rules["invaders_per_turn"] // sum_weights)
@@ -165,7 +179,7 @@ def enemies_proceed():
 				enemies = int(sector.get("enemies",0) // len(neighbours))
 				for s in neighbours:
 					s["pending_invaders"] += enemies
-				sector["enemies"] -= enemies
+					sector["enemies"] -= enemies
 		for col in range(8):
 			for row in range(8):
 				game.map[col][row]["enemies"] += game.map[col][row]["pending_invaders"]
