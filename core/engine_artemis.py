@@ -40,7 +40,7 @@ from core.game_state import updated
 #		-turn_number
 #		-max_turns
 #		-interlude(bool)
-#	-countdown
+#	-_countdown
 #		-get_remaining()
 #	-artemis_clients
 #		-in_combat(bool)
@@ -87,7 +87,7 @@ def get_map():
 def get_turn_status():
 	"Returns the turn dict with the seconds remaining as float"
 	with game._lock:
-		c = game.countdown
+		c = game._countdown
 		turn = copy.deepcopy(game.turn)
 		turn["remaining"] = max(c.get_remaining(), 0)
 		return turn

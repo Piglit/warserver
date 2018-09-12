@@ -14,15 +14,15 @@ import json
 #sector map frames get focus by mouseover, change relief
 #buttons get grey when not enough bps 
 
-terrain_types = {
-	0:    "Empty",                   
-	1:    "Nebula",                   
-	2:    "Minefield",                
-	3:    "Asteroid Belt",            
-	4:    "Black Hole Nursery",       
-	5:    "Wildlands",                
-	6:    "Crossroads",               
-}
+terrain_types = [
+	"Empty",                   
+	"Nebula",                   
+	"Minefield",                
+	"Asteroid Belt",            
+	"Black Hole Nursery",       
+	"Wildlands",                
+	"Crossroads",               
+]
 
 PRIVILEGE_LEVEL = "gm-admiral"
 privilege_flags = {	#binary flags!
@@ -137,19 +137,19 @@ class Sector:
 		self.hidden = False
 		self.color = "grey"
 		self.variables={
-			"Coordinates":	TK.StringVar(value=chr(col+ord('A'))+" "+str(row+1)),
-			"Enemies": 		TK.StringVar(),
-			"Rear_Bases":	TK.StringVar(),
-			"Forward_Bases":TK.StringVar(),
-			"Fire_Bases":	TK.StringVar(),
-			"Name":			TK.StringVar(),
-			"Terrain_string":		TK.StringVar(),
-			"Difficulty":	TK.StringVar(),
-			"Beachhead_mark":	TK.StringVar(),
-			"Ships":		TK.StringVar(),
-			"Enemies_short":	TK.StringVar(),
-			"Difficulty_short":	TK.StringVar(),
-			"Bases_short":	TK.StringVar(),
+			"coordinates":	TK.StringVar(value=chr(col+ord('A'))+" "+str(row+1)),
+			"enemies": 		TK.StringVar(),
+			"rear_bases":	TK.StringVar(),
+			"forward_bases":TK.StringVar(),
+			"fire_bases":	TK.StringVar(),
+			"name":			TK.StringVar(),
+			"terrain_string":		TK.StringVar(),
+			"difficulty":	TK.StringVar(),
+			"beachhead_mark":	TK.StringVar(),
+			"ships":		TK.StringVar(),
+			"enemies_short":	TK.StringVar(),
+			"difficulty_short":	TK.StringVar(),
+			"bases_short":	TK.StringVar(),
 		}
 		self.map_frame = SectorMapFrame(self)
 		self.info_frame = SectorInfoFrame(self)
@@ -165,29 +165,29 @@ class Sector:
 			for key in self.variables:
 				if key in sector:
 					self.variables[key].set(sector[key])
-			self["Coordinates"].set(chr(self.x+ord('A'))+" "+str(self.y+1))
-			self["Terrain_string"].set(sector["terrain"])
-			self["Difficulty"].set(sector["difficulty"])
+			self["coordinates"].set(chr(self.x+ord('A'))+" "+str(self.y+1))
+			self["terrain_string"].set(sector["terrain"])
+			self["difficulty"].set(sector["difficulty"])
 			if sector["beachhead_weight"]:
-				self["Beachhead_mark"].set("Invasion Beachhead")
+				self["beachhead_mark"].set("Invasion Beachhead")
 			else:
-				self["Beachhead_mark"].set("")
+				self["beachhead_mark"].set("")
 			if sector["rear_bases"] + sector["forward_bases"] + sector["fire_bases"] > 0 and not self.fog:
-				self["Bases_short"].set(str(sector["rear_bases"])+"/"+str(sector["forward_bases"])+"/"+str(sector["fire_bases"]))
+				self["bases_short"].set(str(sector["rear_bases"])+"/"+str(sector["forward_bases"])+"/"+str(sector["fire_bases"]))
 			else:
-				self["Bases_short"].set("")
+				self["bases_short"].set("")
 			if sector["enemies"] > 0 and not self.fog:
-				self["Enemies_short"].set("Inv " + str(sector["enemies"]))
-				self["Difficulty_short"].set("D " + str(sector["difficulty"]))
+				self["enemies_short"].set("Inv " + str(sector["enemies"]))
+				self["difficulty_short"].set("D " + str(sector["difficulty"]))
 			else:
-				self["Enemies_short"].set("")
-				self["Difficulty_short"].set("")
+				self["enemies_short"].set("")
+				self["difficulty_short"].set("")
 		else:
 			for key in self.variables:
 				self.variables[key].set("")
 
 		color = ""	
-		if self.variables["Ships"].get() != "":
+		if self.variables["ships"].get() != "":
 			color = "#000033"
 		elif sector["fog"]:
 			color="grey"
@@ -210,15 +210,15 @@ class Sector:
 		self.info_frame.set_color(color)
 		
 	def reset_ships(self):
-		self.variables["Ships"].set("")
+		self.variables["ships"].set("")
 		self.update(state["map"][self.x][self.y])
 
 	def add_ship(self, name):
-		old = self.variables["Ships"].get()
+		old = self.variables["ships"].get()
 		if old == "":
-			self.variables["Ships"].set(name)
+			self.variables["ships"].set(name)
 		else:
-			self.variables["Ships"].set(old+", "+name)
+			self.variables["ships"].set(old+", "+name)
 		color = "#000033"
 		self.set_color(color)
 
@@ -262,7 +262,7 @@ class Sector:
 			terrain = TK.Menu(m, tearoff=False)
 			m.add_cascade(label="Set Terrain", menu = terrain)
 			for key in terrain_types:
-				terrain.add_radiobutton(label=terrain_types[key], value=terrain_types[key], variable=self["Terrain_string"], command=functools.partial(game.set, "game.map." + str(self.x) + "." + str(self.y) + ".terrain", terrain_types[key]))
+				terrain.add_radiobutton(label=key, value=key, variable=self["terrain_string"], command=functools.partial(game.set, "game.map." + str(self.x) + "." + str(self.y) + ".terrain", key))
 			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".enemies"), "Enemies"))
 			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".difficulty"), "Difficulty"))
 			m.add_command(label="Add Beachhead",	command=functools.partial (game.add_beachhead, self.x, self.y))
@@ -282,11 +282,11 @@ class SectorMapFrame(TK.Frame):
 		self.rowconfigure(1,weight=1)
 		self.rowconfigure(2,weight=1)
 		self.rowconfigure(3,weight=1)
-		TK.Label(self, fg="red", 	textvariable=sector["Enemies_short"]).grid	(row=0, column=0, sticky="NW")
-		TK.Label(self, fg="red", 	textvariable=sector["Difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
-		TK.Label(self, fg="yellow", textvariable=sector["Bases_short"]).grid	(row=1, column=0, columnspan=2, sticky="NW")
-		TK.Label(self, fg="#00fc00",textvariable=sector["Ships"]).grid			(row=2, column=0, columnspan=3, sticky="NW")
-		TK.Label(self, fg="white", 	textvariable=sector["Coordinates"]).grid	(row=3, column=0, sticky="SW")
+		TK.Label(self, fg="red", 	textvariable=sector["enemies_short"]).grid	(row=0, column=0, sticky="NW")
+		TK.Label(self, fg="red", 	textvariable=sector["difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
+		TK.Label(self, fg="yellow", textvariable=sector["bases_short"]).grid	(row=1, column=0, columnspan=2, sticky="NW")
+		TK.Label(self, fg="#00fc00",textvariable=sector["ships"]).grid			(row=2, column=0, columnspan=3, sticky="NW")
+		TK.Label(self, fg="white", 	textvariable=sector["coordinates"]).grid	(row=3, column=0, sticky="SW")
 		self.bind("<1>", sector.on_click)
 		self.bind("<3>", sector.on_right_click)
 		for child in self.winfo_children():
@@ -308,16 +308,16 @@ class SectorInfoFrame(InfoFrame):
 		self.columnconfigure(0, weight=0)
 		self.columnconfigure(1, weight=1)
 		self.detail_variables=[
-			VariableLabel(self, fg=sector_text_color, text="Coordinates", 		textvariable=sector["Coordinates"], 	),
-			VariableLabel(self, fg=sector_text_color, text="Invading Enemies", 	textvariable=sector["Enemies"], 		),
-			VariableLabel(self, fg=sector_text_color, text="Alert Level", 		textvariable=sector["Difficulty"], 		),
-			VariableLabel(self, fg=sector_text_color, text="Rear Bases", 		textvariable=sector["Rear_Bases"], 	),
-			VariableLabel(self, fg=sector_text_color, text="Forward Bases", 	textvariable=sector["Forward_Bases"], ),
-			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["Fire_Bases"], 	),
-			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["Name"], 			),
-			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["Terrain_string"], ),
-			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["Ships"], 		wraplength=240, ),
-			VariableLabel(self, fg=sector_text_color, textvariable=sector["Beachhead_mark"]),
+			VariableLabel(self, fg=sector_text_color, text="Coordinates", 		textvariable=sector["coordinates"], 	),
+			VariableLabel(self, fg=sector_text_color, text="Invading Enemies", 	textvariable=sector["enemies"], 		),
+			VariableLabel(self, fg=sector_text_color, text="Alert Level", 		textvariable=sector["difficulty"], 		),
+			VariableLabel(self, fg=sector_text_color, text="Rear Bases", 		textvariable=sector["rear_bases"], 	),
+			VariableLabel(self, fg=sector_text_color, text="Forward Bases", 	textvariable=sector["forward_bases"], ),
+			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["fire_bases"], 	),
+			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["name"], 			),
+			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["terrain_string"], ),
+			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["ships"], 		wraplength=240, ),
+			VariableLabel(self, fg=sector_text_color, textvariable=sector["beachhead_mark"]),
 		]
 
 		self.bind("<3>", sector.on_right_click)
@@ -504,7 +504,7 @@ def turn_menu(event):
 		m.add_command(label="Save Game", command= functools.partial (game.save_game, "gm-save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+"_turn_"+str(state["turn"]["turn_number"])+".sav"))
 		m.add_command(label="End Turn", command= functools.partial (game.end_turn))
 		m.add_command(label="Change Turn Number", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.turn_number"), "Turn Number"))
-		m.add_command(label="Change Total Turns", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "trun.max_turns"), "Total Turns"))
+		m.add_command(label="Change Total Turns", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.max_turns"), "Total Turns"))
 	#	m.add_command(label="Change Remaining Time", command= functools.partial (change_integer_dialog, functools.partial(game.change_turn_time_remaining), "Seconds Remaining"))
 		m.add_command(label="Change Base Points", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "admiral.strategy_points") , "Strategy Points"))
 	#	m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))

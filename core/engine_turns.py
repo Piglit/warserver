@@ -29,7 +29,7 @@ from core import engine_artemis
 #		-max_turns
 #		-interlude(bool)
 #		-last_update
-#	-countdown
+#	-_countdown
 #		-get_remaining()
 #	-rules
 #		-allow_interludes
@@ -48,8 +48,8 @@ def log(msg):
 	print(time.asctime() + " Turn " + str(msg))
 
 def start():
-	if not game.countdown:
-		game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
+	if not game._countdown:
+		game._countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
 		defeat_bases()
 		enemies_proceed()
 		enemies_spawn()
@@ -74,14 +74,14 @@ def start_default_game():
 def proceed_turn(*args, **kwargs):
 	"""proceeds to the next turn"""
 	with game._lock:
-		game.countdown.cancel()	#ignored if this is executed by the timer_thread itself
+		game._countdown.cancel()	#ignored if this is executed by the timer_thread itself
 		turn = game.turn
 		logmsg = None
 		if turn["interlude"]:
 			if turn["turn_number"] <= turn["max_turns"]:
 				#turn_number starts with 1, interlude 1 comes after turn 1.
 				turn["interlude"] = False
-				game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
+				game._countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
 				logmsg = str(turn.turn_number)
 		else:
 			defeat_bases()
@@ -90,10 +90,10 @@ def proceed_turn(*args, **kwargs):
 			engine_artemis.release_all_ships()
 			turn.turn_number += 1
 			if not game.rules.allow_interludes:
-				game.countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
+				game._countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
 			else:
 				turn.interlude = True
-				game.countdown = countdown(game.rules.seconds_per_interlude, proceed_turn)
+				game._countdown = countdown(game.rules.seconds_per_interlude, proceed_turn)
 
 			logmsg = "interlude"
 		updated("turn")

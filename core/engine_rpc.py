@@ -2,11 +2,13 @@
 from core.game_state import game
 import core.engine_turns
 import copy
-#import json
+from box import Box
+import json
+
 ## game state structure that needs special handling:
 # game
 #	-_lock
-#	-countdown
+#	-_countdown
 #		-get_remaining()
 #	-admiral
 #		-strategy_points
@@ -20,11 +22,23 @@ class rpc:
 		return True
 
 	def get_game_state(self):
-		game_state = copy.deepcopy(game)
-		del game_state["_lock"]
-		del game_state["countdown"]
-		game_state["turn"]["remaining"] = game.countdown.get_remaining()
-		game_state = game_state.to_json()
+		game_state_dict = dict()
+		game_state_json = "{"
+		with game._lock:
+			for key, value in game.items():
+				if key.startswith("_"):
+					continue
+				else:
+					if isinstance(value, Box):
+						if key == "turn":
+							value = copy.deepcopy(value.to_dict())
+							value["remaining"] = game.countdown.get_remaining()
+							game_state_dict[key] = value
+						else:
+							game_state_json += '"'+ key +'": ' + value.to_json() + ', '
+					else:
+						game_state_dict[key] = copy.deepcopy(value)
+			game_state = game_state_json + json.dumps(game_state_dict).lstrip("{")
 		return game_state
 
 	def get(self, path):

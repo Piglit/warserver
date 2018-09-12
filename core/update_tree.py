@@ -7,7 +7,7 @@ update_tree = dict()
 #-game
 #	-map
 #	-turn
-#	-countdown
+#	-_countdown
 #	-artemis_clients
 #	-admiral
 #	-rules

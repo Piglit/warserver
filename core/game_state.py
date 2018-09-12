@@ -62,7 +62,7 @@ def init_sector(**kwargs):
 #		-max_turns
 #		-interlude(bool)
 #		-last_update
-#	-countdown
+#	-_countdown
 #		-get_remaining()
 #	-artemis_clients
 #		-in_combat(bool)
