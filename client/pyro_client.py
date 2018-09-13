@@ -145,7 +145,7 @@ class Sector:
 			"name":			TK.StringVar(),
 			"terrain_string":		TK.StringVar(),
 			"difficulty":	TK.StringVar(),
-			"beachhead_mark":	TK.StringVar(),
+			"spawning":		TK.StringVar(),
 			"ships":		TK.StringVar(),
 			"enemies_short":	TK.StringVar(),
 			"difficulty_short":	TK.StringVar(),
@@ -168,10 +168,10 @@ class Sector:
 			self["coordinates"].set(chr(self.x+ord('A'))+" "+str(self.y+1))
 			self["terrain_string"].set(sector["terrain"])
 			self["difficulty"].set(sector["difficulty"])
-			if sector["beachhead_weight"]:
-				self["beachhead_mark"].set("Invasion Beachhead")
+			if sector["beachhead_weight"] and sector["beachhead_weight"] and "invaders_per_weight" in state:
+				self["spawning"].set(str(int(sector["beachhead_weight"] * state["invaders_per_weight"])))
 			else:
-				self["beachhead_mark"].set("")
+				self["spawning"].set("0")
 			if sector["rear_bases"] + sector["forward_bases"] + sector["fire_bases"] > 0 and not self.fog:
 				self["bases_short"].set(str(sector["rear_bases"])+"/"+str(sector["forward_bases"])+"/"+str(sector["fire_bases"]))
 			else:
@@ -265,8 +265,8 @@ class Sector:
 				terrain.add_radiobutton(label=key, value=key, variable=self["terrain_string"], command=functools.partial(game.set, "game.map." + str(self.x) + "." + str(self.y) + ".terrain", key))
 			m.add_command(label="Change Enemy Number", command=functools.partial (change_integer_dialog, functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".enemies"), "Enemies"))
 			m.add_command(label="Change Difficulty", command=functools.partial (change_integer_dialog, functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".difficulty"), "Difficulty"))
-			m.add_command(label="Add Beachhead",	command=functools.partial (game.add_beachhead, self.x, self.y))
-			m.add_command(label="Remove Beachhead",	command=functools.partial (game.remove_beachhead, self.x, self.y))
+			m.add_command(label="Add Beachhead",	command=functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".beachhead_weight", 1))
+			m.add_command(label="Remove Beachhead",	command=functools.partial (game.modify, "game.map." + str(self.x) + "." + str(self.y) + ".beachhead_weight", -1))
 			m.add_command(label="Change Name", command=functools.partial (change_string_dialog, functools.partial (game.set, "game.map." + str(self.x) + "." + str(self.y) + ".name"), "Sector Name"))
 
 class SectorMapFrame(TK.Frame):
@@ -310,14 +310,14 @@ class SectorInfoFrame(InfoFrame):
 		self.detail_variables=[
 			VariableLabel(self, fg=sector_text_color, text="Coordinates", 		textvariable=sector["coordinates"], 	),
 			VariableLabel(self, fg=sector_text_color, text="Invading Enemies", 	textvariable=sector["enemies"], 		),
-			VariableLabel(self, fg=sector_text_color, text="Alert Level", 		textvariable=sector["difficulty"], 		),
+			VariableLabel(self, fg=sector_text_color, text="Incomming Invaders",textvariable=sector["spawning"], 		),
+			VariableLabel(self, fg=sector_text_color, text="Difficulty Level",	textvariable=sector["difficulty"], 		),
 			VariableLabel(self, fg=sector_text_color, text="Rear Bases", 		textvariable=sector["rear_bases"], 	),
 			VariableLabel(self, fg=sector_text_color, text="Forward Bases", 	textvariable=sector["forward_bases"], ),
 			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["fire_bases"], 	),
 			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["name"], 			),
 			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["terrain_string"], ),
 			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["ships"], 		wraplength=240, ),
-			VariableLabel(self, fg=sector_text_color, textvariable=sector["beachhead_mark"]),
 		]
 
 		self.bind("<3>", sector.on_right_click)
@@ -501,17 +501,19 @@ def turn_menu(event):
 		else: 
 			m.add_command(label="Skip Interlude", state="disabled")
 	if allow_privilege("gm"):
-		m.add_command(label="Save Game", command= functools.partial (game.save_game, "gm-save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+"_turn_"+str(state["turn"]["turn_number"])+".sav"))
-		m.add_command(label="End Turn", command= functools.partial (game.end_turn))
-		m.add_command(label="Change Turn Number", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.turn_number"), "Turn Number"))
-		m.add_command(label="Change Total Turns", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.max_turns"), "Total Turns"))
-	#	m.add_command(label="Change Remaining Time", command= functools.partial (change_integer_dialog, functools.partial(game.change_turn_time_remaining), "Seconds Remaining"))
-		m.add_command(label="Change Base Points", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "admiral.strategy_points") , "Strategy Points"))
+		if allow_privilege("admiral"):
+			m.add_separator()
+		m.add_command(label="Save game", command= functools.partial (game.save_game, "gm-save_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))+"_turn_"+str(state["turn"]["turn_number"])+".sav"))
+		m.add_command(label="End turn", command= functools.partial (game.end_turn))
+		m.add_command(label="Change turn number", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.turn_number"), "Turn Number"))
+		m.add_command(label="Change total turns", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "turn.max_turns"), "Total Turns"))
+		m.add_command(label="Change remaining time", command= functools.partial (change_integer_dialog, functools.partial(game.change_turn_time_remaining), "Seconds Remaining"))
+		m.add_command(label="Change base points", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "admiral.strategy_points") , "Base Points"))
 	#	m.add_command(label="Expand Fog of War", command= functools.partial (game.reset_fog))
 	#	m.add_command(label="Change global Difficulty", command= functools.partial (change_integer_dialog, functools.partial(game.change_setting, "game difficulty level"), "global Difficulty"))
-		m.add_command(label="Change Invaders Per Turn", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "rules.invaders_per_turn"), "Invaders per turn"))
-		m.add_command(label="Change Minutes Per Turn", command= functools.partial (change_float_dialog, functools.partial(game.modify, "rules.seconds_per_turn"), "Seconds per turn"))
-		m.add_command(label="Change Minutes between Turns", command= functools.partial (change_float_dialog, functools.partial(game.modify, "seconds_per_interlude"), "Seconds between turns"))
+		m.add_command(label="Change invaders per turn", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "rules.invaders_per_turn"), "Invaders per turn"))
+		m.add_command(label="Change time per turn", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "rules.seconds_per_turn"), "Seconds per turn"))
+		m.add_command(label="Change time between turns", command= functools.partial (change_integer_dialog, functools.partial(game.modify, "rules.seconds_per_interlude"), "Seconds between turns"))
 
 def score_menu(event):
 	if allow_privilege("admiral"):
@@ -609,7 +611,7 @@ VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, text="Remaining War
 VariableLabel(turn_frame, bg=turn_color, fg=turn_text_color, textvariable=turn_string)
 
 #base points
-base_points = VariableLabel(turn_frame, text="Base Points")
+strategy_points = VariableLabel(turn_frame, text="Base Points")
 
 turn_frame.show()
 turn_frame.enable_right_click_menu()
@@ -631,7 +633,7 @@ score_frame.enable_right_click_menu()
 
 #techboard
 if allow_privilege("gm"):
-	tech_frame.show()
+	#tech_frame.show()
 	tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
 	tech_frame.enable_right_click_menu() #not implemented yet
 
@@ -685,8 +687,9 @@ def update():
 			time_war += time_remain  
 			turn_war_time.set(time_war)
 
-		if "base_points" in updates:
-			base_points.set(str(state["base_points"]))
+		if "admiral" in updates:
+			if "strategy_points" in updates["admiral"]:
+				strategy_points.set(str(state["admiral"]["strategy_points"]))
 
 		if "ships" in updates:
 			for x in range(0,8):
@@ -737,6 +740,18 @@ def update():
 			y = sector["y"]
 			state["map"][x][y].update(sector)
 			map_data[x][y].update(sector)
+		if map_iterator:
+			sum_of_beachhead_weights = 0
+			for col in state["map"]:
+				for sector in col:
+					if sector["beachhead_weight"] > 0:
+						sum_of_beachhead_weights += sector["beachhead_weight"]
+			if sum_of_beachhead_weights > 0 and "invaders_per_turn" in state["rules"]:
+				state["invaders_per_weight"] = state["rules"]["invaders_per_turn"] // sum_of_beachhead_weights
+			else:
+				#prevent div by zero
+				state["invaders_per_weight"] = 1
+			
 
 print("Starting interface")
 

@@ -142,25 +142,12 @@ class rpc:
 		return True
 
 	def end_turn(self):
-		game_turn.proceed_turn()
+		core.engine_turns.proceed_turn()
 
 	def change_turn_time_remaining(self,seconds):
 		assert type(seconds) is int, "seconds must be int"
-		game.change_turn_time_remaining(seconds)
-
-	def add_beachhead(self,x,y):
-		assert type(x) == int, "x must be int"
-		assert type(y) == int, "y must be int"
-		assert x >= 0 and x < 8, "0 <= x <= 7"
-		assert y >= 0 and y < 8, "0 <= y <= 7"
-		game.add_beachhead(x,y)
-
-	def remove_beachhead(self,x,y):
-		assert type(x) == int, "x must be int"
-		assert type(y) == int, "y must be int"
-		assert x >= 0 and x < 8, "0 <= x <= 7"
-		assert y >= 0 and y < 8, "0 <= y <= 7"
-		game.remove_beachhead(x,y)
+		with game._lock:
+			game._countdown.inc(seconds)
 
 	def save_game(self):
 		pass
