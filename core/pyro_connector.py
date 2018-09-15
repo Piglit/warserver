@@ -22,7 +22,7 @@ class pyro_rpc(rpc):
 		return rpc.get_game_state(self)
 
 	def get(self, path):
-		print("get"+str(path))
+	#	print("get "+str(path))
 		return rpc.get(self, path)
 	
 	def set(self, path, value):

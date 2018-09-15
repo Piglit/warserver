@@ -50,6 +50,10 @@ class rpc:
 			except AttributeError:
 				target = None
 				break
+			if item == "turn":
+				value = copy.deepcopy(target.to_dict())
+				value["remaining"] = game.countdown.get_remaining()
+				target = value
 		try:
 			retval = target.to_json()
 		except AttributeError:
