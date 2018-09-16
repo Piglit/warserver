@@ -318,7 +318,11 @@ class Game:
 	def set_setting(self, key, value):
 		with self._lock:
 			try:
+<<<<<<< HEAD
 				assert type(self.settings[key]) == type(value)
+=======
+				assert(type(self.settings[key]) == type(value))
+>>>>>>> 7ced9b9a7b63c968d7ad2eb75028a1e55582b919
 				self.settings[key] = value
 				self.settings["last_update"] = time.time()
 			except Exception as e:
@@ -553,8 +557,13 @@ class Game:
 				self.change_base_points(1)
 				self.scoreboard_clears[shipname] += 1
 				self.map[x][y]["Enemies"] = 0
+<<<<<<< HEAD
 				for _x, _y in self._all_neighbours(x, y):
 					self.map[_x][_y]["fog"] = False
+=======
+				for _x, _y in self._all_neighbours(x,y):
+					self.map[_x][_y]["fog"] = False 
+>>>>>>> 7ced9b9a7b63c968d7ad2eb75028a1e55582b919
 				self._map_changed()
 				t = time.time()
 				self.various_last_update = t

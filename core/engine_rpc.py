@@ -1,5 +1,6 @@
 
 from core.game_state import game
+from core import game_state as engine
 import core.engine_turns
 import copy
 from box import Box
@@ -22,60 +23,11 @@ class rpc:
 		return True
 
 	def get_game_state(self):
-		game_state_dict = dict()
-		game_state_json = "{"
-		with game._lock:
-			for key, value in game.items():
-				if key.startswith("_"):
-					continue
-				else:
-					if isinstance(value, Box):
-						if key == "turn":
-							value = copy.deepcopy(value.to_dict())
-							value["remaining"] = game.countdown.get_remaining()
-							game_state_dict[key] = value
-						else:
-							game_state_json += '"'+ key +'": ' + value.to_json() + ', '
-					else:
-						game_state_dict[key] = copy.deepcopy(value)
-			game_state = game_state_json + json.dumps(game_state_dict).lstrip("{")
-		return game_state
+		return engine.get_game_state_as_json()
 
 	def get(self, path):
-		items = path.split(".")
-		target = game
-		for item in items:
-			try:
-				target = target.get(item)
-			except AttributeError:
-				target = None
-				break
-			if item == "turn":
-				value = copy.deepcopy(target.to_dict())
-				value["remaining"] = game.countdown.get_remaining()
-				target = value
-		try:
-			retval = target.to_json()
-		except AttributeError:
-			retval = json.dumps(target)
-		return retval
-#
-#	def call(self, path, *args, **kwargs):
-#		items = path.split(".")
-#		target = game
-#		for item in items[:-1]:
-#			try:
-#				target = target.get(item)
-#			except AttributeError:
-#				target = None
-#				break
-#		target = items[-1](target, args, kwargs)
-#		try:
-#			retval = target.to_json()
-#		except AttributeError:
-#			retval = json.dumps(target)
-#		return retval
-#
+		return engine.get_item_as_json(path)
+
 	def set(self, path, value):
 		#value = json.loads(value)
 		items = path.split(".")
@@ -153,5 +105,5 @@ class rpc:
 		with game._lock:
 			game._countdown.inc(seconds)
 
-	def save_game(self):
-		pass
+	def save_game(self, filename):
+		engine.save_game(filename)

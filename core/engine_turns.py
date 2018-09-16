@@ -9,6 +9,7 @@ import time
 from box import Box
 from core.game_state import game
 from core.game_state import updated 
+from core.game_state import save_game 
 from core.countdown import countdown
 from core import engine_artemis
 
@@ -47,12 +48,13 @@ __version__ = 1.0
 def log(msg):
 	print(time.asctime() + " Turn " + str(msg))
 
-def start():
+def start(remaining=None):
+	if remaining is not None:
+		t = remaining
+	else:
+		t = game.rules.seconds_per_turn
 	if not game._countdown:
-		game._countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
-		defeat_bases()
-		enemies_proceed()
-		enemies_spawn()
+		game._countdown = countdown(t, proceed_turn)
 	updated("turn")
 
 def start_default_game():
@@ -94,12 +96,13 @@ def proceed_turn(*args, **kwargs):
 			else:
 				turn.interlude = True
 				game._countdown = countdown(game.rules.seconds_per_interlude, proceed_turn)
+			save_game("_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())+"_turn_"+str(turn["turn_number"])+".sav")
 
 			logmsg = "interlude"
 		updated("turn")
 	if logmsg:
 		log(logmsg + " started")
-			#game.save("_autosave_"+time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(t))+"_turn_"+str(turn["turn_number"])+".sav")
+
 
 
 def defeat_bases():

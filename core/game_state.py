@@ -4,6 +4,8 @@ import pickle
 import core.picklable as picklable
 import random
 import copy
+import json
+import os
 
 """the game object is accessible from all engine modules"""
 game = Box(default_box=True)
@@ -96,10 +98,51 @@ def init_sector(**kwargs):
 
 def updated(*args):
 	"""something (given in args) has changed. Notifications are sent"""
+	#TODO args should be used
 	with game._lock:
 		for event in game._notifications:
 			event.set()
 
+def get_game_state_as_json():
+	game_state_dict = dict()
+	game_state_json = "{"
+	global game
+	with game._lock:
+		for key, value in game.items():
+			if key.startswith("_"):
+				continue
+			else:
+				if isinstance(value, Box):
+					if key == "turn":
+						value = copy.deepcopy(value.to_dict())
+						value["remaining"] = game.countdown.get_remaining()
+						game_state_dict[key] = value
+					else:
+						game_state_json += '"'+ key +'": ' + value.to_json() + ', '
+				else:
+					game_state_dict[key] = copy.deepcopy(value)
+		game_state = game_state_json + json.dumps(game_state_dict).lstrip("{")
+	return game_state
+
+def get_item_as_json(path):
+	global game
+	items = path.split(".")
+	target = game
+	for item in items:
+		try:
+			target = target.get(item)
+		except AttributeError:
+			target = None
+			break
+		if item == "turn":
+			value = copy.deepcopy(target.to_dict())
+			value["remaining"] = game.countdown.get_remaining()
+			target = value
+	try:
+		retval = target.to_json()
+	except AttributeError:
+		retval = json.dumps(target)
+	return retval
 
 def save_game(filename):
 	"""
@@ -107,24 +150,23 @@ def save_game(filename):
 		When calling manually, call get_turn_status before, to set remaining time correctly.
 		Otherwise the game time is set to the last call of get_turn_status from any client.
 	"""
-	with game._lock:
-		try:
-			directory = "SaveGamesWarServer"
-			filename = os.path.basename(filename)	#no directory traversal possible
-			os.makedirs(directory, exist_ok=True)
-			with open(directory+"/"+filename, "wb") as file:
-				#TODO check
-				pickle.dump(game.to_dict(), file)
-		except Exception as e:
-			print("save failed: "+str(e))
-
+	json_game = get_game_state_as_json()
+	try:
+		directory = "SaveGamesWarServer"
+		filename = os.path.basename(filename)	#no directory traversal possible
+		os.makedirs(directory, exist_ok=True)
+		with open(directory+"/"+filename, "w") as file:
+			file.write(json_game)
+		print("saved game as "+filename)
+	except Exception as e:
+		print("save failed: "+str(e))
 
 def create_game(save):
 	"""creates a new game from file. (file may be empty)"""
 	global game
 	if save:
 		try:
-			game.update(Box(pickle.load(save), default_box=True))
+			game.update(Box(json.load(save), default_box=True))
 		except:
 			game.update(Box(yaml.load(save), default_box=True))
 	else:

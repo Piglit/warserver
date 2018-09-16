@@ -53,9 +53,9 @@ class pyro_rpc(rpc):
 		print("remove_beachhead",x,y)
 		return rpc.remove_beachhead(self,x,y)
 
-	def save_game(self):
+	def save_game(self, filename):
 		print("save_game")
-		return rpc.save_game(self)
+		return rpc.save_game(self, filename)
 
 def get_ip():
 	"""* 

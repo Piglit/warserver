@@ -17,11 +17,10 @@ if __name__ == "__main__":
 
 	print("starting warserver")
 	game = game_state.create_game(args.load)
-	if False :#not args.headless:
-		import client.startmenu
-		client.startmenu.start(game)
+	print("starting warserver in headless mode")
+	if game.turn.remaining:
+		engine_turns.start(game.turn.remaining)
 	else:
-		print("starting warserver in headless mode")
 		engine_turns.start_default_game()
 	#print(game)
 	artemis_connector.start_server()
