@@ -77,7 +77,7 @@ def get_map():
 	rv = []
 	with game._lock:
 		for x,column in sorted(game.map.items()):
-			assert x == len(rv)
+			assert x == len(rv), "x: "+ str(x) +" rv: "+str(rv)
 			rv.append([])
 			for y,sector in sorted(column.items()):
 				assert y == len(rv[x])

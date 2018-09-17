@@ -180,6 +180,17 @@ def create_game(save):
 				printable_coordinates = str(chr(ord("A")+x)) + str(y+1)
 				terrain = random.choice(["Sector","Nebula","Minefield","Asteroid Belt","Black Hole Nursery","Wildlands","Crossroads"])
 				game.map[x][y] = Box(init_sector(x=x, y=y, coordinates=printable_coordinates, seed=random.randrange(0x7fff*2), terrain=terrain))
+	else:
+		# keys may be strings now
+		new_map = Box()
+		for x, column in game.map.items():
+			assert int(x) == len(new_map)
+			new_map[int(x)] = Box()
+			for y, sector in column.items():
+				assert int(y) == len(new_map[int(x)])
+				new_map[int(x)][int(y)] = sector
+		game.map = new_map		
+		
 
 	if not game.rules:
 		#Test mode
