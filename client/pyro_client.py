@@ -628,7 +628,7 @@ for col in range(0,8):
 
 #scoreboard
 score_frame.show()
-score_frame.set_column_headings("Name","Kills","Clears", bg=ships_color, fg="white")
+score_frame.set_column_headings("Name","Kills","Cleared","Entered", bg=ships_color, fg="white")
 score_frame.enable_right_click_menu()
 
 #techboard
@@ -691,40 +691,43 @@ def update():
 			if "strategy_points" in updates["admiral"]:
 				strategy_points.set(str(state["admiral"]["strategy_points"]))
 
-		if "ships" in updates:
+		if "artemis_clients" in updates:
 			for x in range(0,8):
 				for y in range(0,8):
 					map_data[x][y].reset_ships()
-			for k in state["ships"]:
+			for k, ship in state["artemis_clients"].items():
 				ip,port = k
-				name,x,y,_,enemies = state["ships"][k]
+				battle = ship["battle"]
+				name = ship["shipname"]
+				x = battle["x"]
+				y = battle["y"]
 				if x > 0:
 					sector = chr(x+ord('A')) + str(y+1)
-					map_data[x][y].add_ship(name)
+					map_data[x][y].add_ship(ship["shipname"])
 				else:	
 					sector = None
 				if k not in tech_frame:
 					tech_frame.add_row(k, fg="cyan")
-				tech_frame.set_row(k, Name=name, Address=str(ip))#+":"+str(port))
+				tech_frame.set_row(k, Name=ship["shipname"], Address=str(ip))#+":"+str(port))
+
+				if "score" in ship:
+					kills = ship["score"]["total"]["kills"]
+					clears = ship["score"]["total"]["clears"]
+					enters = ship["score"]["total"]["enterd"]
+					if (kills == 0) and (clears == 0):
+						if name in score_frame:
+							scoreboard.remove_row(name)
+					else:
+						if name not in score_frame:
+							score_frame.add_row(name, fg="cyan")
+						score_frame.set_row(name, Name=name, Kills=kills, Clears=clears, Entered=enterd)
+			info_pane.paneconfig(score_frame, height=score_frame.winfo_reqheight())
 
 			for k in tech_frame:
-				if k not in state["ships"]:
+				if k not in state["artemis_clients"]:
 					tech_frame.remove_row(k)
 			if allow_privilege("gm"):
 				info_pane.paneconfig(tech_frame, height=tech_frame.winfo_reqheight())
-
-		if "scoreboard" in updates:
-			for name in state["scoreboard"][1]:
-				kills = state["scoreboard"][1].get(name)
-				clears = state["scoreboard"][0].get(name)
-				if (kills == None or kills == 0) and (clears == None or clears == 0):
-					if name in score_frame:
-						scoreboard.remove_row(name)
-				else:
-					if name not in score_frame:
-						score_frame.add_row(name, fg="cyan")
-					score_frame.set_row(name, Name=name, Kills=state["scoreboard"][1][name], Clears=state["scoreboard"][0].get(name))
-			info_pane.paneconfig(score_frame, height=score_frame.winfo_reqheight())
 
 		if "sectors" in updates:
 			map_iterator = updates["sectors"]

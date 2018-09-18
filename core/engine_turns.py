@@ -40,6 +40,18 @@ from core import engine_artemis
 #		-seconds_per_turn
 #		-seconds_per_interlude
 #		-enemies_dont_go_direction == [ none | north | south | west | east ]
+#	-artemis_clients
+#		-log
+#		-shipname
+#		-score
+#			-turns[]
+#				-enterd
+#				-kills
+#				-clears
+#			-total
+#				-enterd
+#				-kills
+#				-clears
 #	-_notifications(list)
 
 __author__ = "Pithlit"
@@ -83,6 +95,7 @@ def proceed_turn(*args, **kwargs):
 			if turn["turn_number"] <= turn["max_turns"]:
 				#turn_number starts with 1, interlude 1 comes after turn 1.
 				turn["interlude"] = False
+				zip_logs(turn.turn_number-1)
 				game._countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
 				logmsg = str(turn.turn_number)
 		else:
@@ -90,6 +103,7 @@ def proceed_turn(*args, **kwargs):
 			enemies_proceed()
 			enemies_spawn()
 			engine_artemis.release_all_ships()
+			zip_logs(turn.turn_number)
 			turn.turn_number += 1
 			if not game.rules.allow_interludes:
 				game._countdown = countdown(game.rules.seconds_per_turn, proceed_turn)
@@ -187,6 +201,36 @@ def enemies_proceed():
 			for row in range(8):
 				game.map[col][row]["enemies"] += game.map[col][row]["pending_invaders"]
 				game.map[col][row]["pending_invaders"] = 0
+
+def zip_logs(turn_number):
+	"""summarizes the log entries for each artemis client
+		turn_number is the number of the just passed turn.
+		it may exist before, for different reasons
+	"""
+	with game._lock:
+		for client, ship in game.artemis_clients.items():
+			if not ship.shipname or not ship.log:
+				continue
+			if not game.artemis_clients[client].score.total:
+				game.artemis_clients[client].score.total.kills = 0
+				game.artemis_clients[client].score.total.clears = 0
+				game.artemis_clients[client].score.total.entered = 0
+			if not game.artemis_clients[client].score.turns[turn_number]:
+				game.artemis_clients[client].score.turns[turn_number].kills = 0
+				game.artemis_clients[client].score.turns[turn_number].clears = 0
+				game.artemis_clients[client].score.turns[turn_number].entered = 0
+			for time, entry in ship.log.items():
+				what = entry[0]
+				if what == "kills":
+					game.artemis_clients[client].score.total.kills += entry[1]
+					game.artemis_clients[client].score.turns[turn_number].kills += entry[1]
+				if what == "clears":
+					game.artemis_clients[client].score.total.clears += 1
+					game.artemis_clients[client].score.turns[turn_number].clears += 1
+				if what == "enter_sector":
+					game.artemis_clients[client].score.total.entered += 1
+					game.artemis_clients[client].score.turns[turn_number].entered += 1
+			del ship.log
 
 def _adjacent_for_enemies(x_0, y_0):
 	"""returns all sectors, that count as connected for enemies"""
