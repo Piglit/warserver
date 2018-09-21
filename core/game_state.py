@@ -183,10 +183,10 @@ def create_game(save):
 	else:
 		# keys may be strings now
 		new_map = Box()
-		for x, column in game.map.items():
+		for x, column in sorted(game.map.items()):
 			assert int(x) == len(new_map)
 			new_map[int(x)] = Box()
-			for y, sector in column.items():
+			for y, sector in sorted(column.items()):
 				assert int(y) == len(new_map[int(x)])
 				new_map[int(x)][int(y)] = sector
 		game.map = new_map		
