@@ -651,9 +651,9 @@ def update():
 			updates = json.loads(game.get_game_state())#state["last_update"])
 			if "map" in updates:
 				corrected_map = []
-				for x, col in updates["map"].items():
+				for x, col in sorted(updates["map"].items()):
 					corrected_map.append([])
-					for y, sector in col.items():
+					for y, sector in sorted(col.items()):
 						corrected_map[int(x)].append(sector)
 				updates["map"] = corrected_map
 			#print(updates)
