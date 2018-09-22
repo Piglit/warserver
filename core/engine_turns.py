@@ -231,7 +231,7 @@ def zip_logs(turn_number):
 				if what == "kills":
 					game.artemis_clients[client].score.total.kills += entry[1]
 					game.artemis_clients[client].score.turns[turn_number].kills += entry[1]
-				if what == "clears":
+				if what == "clear":
 					game.artemis_clients[client].score.total.clears += 1
 					game.artemis_clients[client].score.turns[turn_number].clears += 1
 				if what == "enter_sector":

@@ -342,7 +342,7 @@ def compose_map_col(index, column_data):
 def compose_sector(sector_data):
 	"""creates a sector for a client to play"""
 	subtype = struct.pack(">H", PACKAGE_SUBTYPES_ENCODE["Data-Sector"])
-	print("SECTOR: " +str(sector_data))
+	#print("SECTOR: " +str(sector_data))
 	return subtype + struct.pack("<HbbbbHxxHxxbxxxb", sector_data["enemies"],
 								 sector_data["rear_bases"], sector_data["forward_bases"],
 								 sector_data["fire_bases"], sector_data["unknown"],

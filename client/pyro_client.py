@@ -9,6 +9,7 @@ import itertools
 import functools
 import string
 import json
+from collections import OrderedDict
 
 #ideas:
 #sector map frames get focus by mouseover, change relief
@@ -24,7 +25,7 @@ terrain_types = [
 	"Crossroads",               
 ]
 
-PRIVILEGE_LEVEL = "gm"
+PRIVILEGE_LEVEL = "admiral"
 privilege_flags = {	#binary flags!
 	"gm-admiral":	3,
 	"gm":		2,
@@ -332,12 +333,12 @@ class SectorInfoFrame(InfoFrame):
 class TableFrame(InfoFrame):
 	def __init__(self, *args, **kwargs):
 		InfoFrame.__init__(self, *args, **kwargs)
-		self.headings = {}
-		self.items = {}
+		self.headings = OrderedDict()
+		self.items = OrderedDict()
 
 	def set_column_headings(self, *headings, **kwargs):
-		self.headings = {}
-		self.items = {}
+		self.headings = OrderedDict()
+		self.items = OrderedDict()
 		col = 0
 		for h in headings:
 			self.headings[h] = col
@@ -683,8 +684,10 @@ def update():
 
 		if "artemis_clients" in updates:
 			for ip, ship in state["artemis_clients"].items():
-				x = ship["battle"].get("x")
-				y = ship["battle"].get("y")
+				if "battle" in ship:
+					x = ship["battle"].get("x")
+					y = ship["battle"].get("y")
+				name = ship["shipname"]
 				if ip not in tech_frame:
 					tech_frame.add_row(ip, fg="cyan")
 				tech_frame.set_row(ip, Name=ship["shipname"], Address=str(ip))#+":"+str(port))
@@ -692,14 +695,14 @@ def update():
 				if "score" in ship:
 					kills = ship["score"]["total"]["kills"]
 					clears = ship["score"]["total"]["clears"]
-					enters = ship["score"]["total"]["enterd"]
-					if (kills == 0) and (clears == 0):
+					entered = ship["score"]["total"]["entered"]
+					if (kills == 0) and (clears == 0) and (entered == 0):
 						if name in score_frame:
 							scoreboard.remove_row(name)
 					else:
 						if name not in score_frame:
 							score_frame.add_row(name, fg="cyan")
-						score_frame.set_row(name, Name=name, Kills=kills, Clears=clears, Entered=enterd)
+						score_frame.set_row(name, Name=name, Kills=kills, Cleared=clears, Entered=entered)
 			info_pane.paneconfig(score_frame, height=score_frame.winfo_reqheight())
 
 			for ip in tech_frame:

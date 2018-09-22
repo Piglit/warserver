@@ -225,7 +225,7 @@ def enter_sector(x, y, shipname, client):
 			game.artemis_clients[client].log[t] = ("on_map")	
 			updated("artemis_clients", client, "log")
 			return None
-		log(shipname + str(client) + " entering sector " + str(sector.coordinates) )
+		log(shipname + " entering sector " + str(sector.coordinates) )
 		return _start_battle(client, sector)
 		
 def kills_in_sector(shipname, id, kills, client):
@@ -248,7 +248,7 @@ def kills_in_sector(shipname, id, kills, client):
 		c.log[t] = ("kills",kills)	
 		updated("artemis_clients", client)
 		updated("map",battle.x,battle.y)
-	log(shipname + str(client) + " killed " + str(kills) + " in " + str(sector.coordinates))
+	log(shipname + " killed " + str(kills) + " in " + str(sector.coordinates))
 
 def clear_sector(shipname, id, client):
 	"""
@@ -262,6 +262,7 @@ def clear_sector(shipname, id, client):
 		c = game.artemis_clients[client]
 		package_arrived_in_interlude = False
 		if not c.in_combat:
+			return #FIXME, client could have already sent this package	
 			if not c.battle:
 				return
 			#clear arrived after turn over: check if no enemies are left.
@@ -278,7 +279,7 @@ def clear_sector(shipname, id, client):
 		_release_ship(client)	#_release_ship updates
 		game.admiral.strategy_points += 1
 		updated("admiral")
-	log(shipname + str(c) + " cleared " + str(sector.coordinates))
+	log(shipname + " cleared " + str(sector.coordinates))
 
 def disconnect_client(self, client):
 	"""When a client disconects, free the sector"""
