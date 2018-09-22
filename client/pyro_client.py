@@ -25,7 +25,7 @@ terrain_types = [
 	"Crossroads",               
 ]
 
-PRIVILEGE_LEVEL = "gm"
+PRIVILEGE_LEVEL = "admiral"
 privilege_flags = {	#binary flags!
 	"gm-admiral":	3,
 	"gm":		2,
@@ -623,10 +623,9 @@ score_frame.set_column_headings("Name","Kills","Cleared","Entered", bg=ships_col
 score_frame.enable_right_click_menu()
 
 #techboard
-if allow_privilege("gm"):
-	#tech_frame.show()
-	tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
-	tech_frame.enable_right_click_menu() #not implemented yet
+#tech_frame.show()
+tech_frame.set_column_headings("Name","Address", bg=ships_color, fg="white")
+tech_frame.enable_right_click_menu() #not implemented yet
 
 
 
