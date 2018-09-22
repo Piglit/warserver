@@ -100,8 +100,15 @@ def proceed_turn(*args, **kwargs):
 
 			logmsg = "interlude"
 		updated("turn")
+
+		total_enemies = 0
+		for column in game.map.values():	
+			for sector in column.values():
+				total_enemies += sector["enemies"]
 	if logmsg:
-		log(logmsg + " started")
+		log(logmsg + " started; Total Invaders: " + str(total_enemies))
+
+
 
 
 

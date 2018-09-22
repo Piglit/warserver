@@ -24,7 +24,7 @@ terrain_types = [
 	"Crossroads",               
 ]
 
-PRIVILEGE_LEVEL = "admiral"
+PRIVILEGE_LEVEL = "gm"
 privilege_flags = {	#binary flags!
 	"gm-admiral":	3,
 	"gm":		2,
@@ -146,14 +146,13 @@ class Sector:
 			"terrain_string":		TK.StringVar(),
 			"difficulty":	TK.StringVar(),
 			"spawning":		TK.StringVar(),
-			"ships":		TK.StringVar(),
 			"enemies_short":	TK.StringVar(),
 			"difficulty_short":	TK.StringVar(),
 			"bases_short":	TK.StringVar(),
+			"client_inside":	TK.StringVar(),
 		}
 		self.map_frame = SectorMapFrame(self)
 		self.info_frame = SectorInfoFrame(self)
-
 
 	def __getitem__(self, item):
 		return self.variables[item]	#raises key error
@@ -182,12 +181,16 @@ class Sector:
 			else:
 				self["enemies_short"].set("")
 				self["difficulty_short"].set("")
+			if sector["client_inside"]:
+				self["client_inside"].set(str.join(" ", sector["client_inside"].values()))
+			else:
+				self["client_inside"].set("")
 		else:
 			for key in self.variables:
 				self.variables[key].set("")
 
 		color = ""	
-		if self.variables["ships"].get() != "":
+		if self.variables["client_inside"].get() not in ["", "{}"]:
 			color = "#000033"
 		elif sector["fog"]:
 			color="grey"
@@ -209,19 +212,6 @@ class Sector:
 		self.map_frame.set_color(color)
 		self.info_frame.set_color(color)
 		
-	def reset_ships(self):
-		self.variables["ships"].set("")
-		self.update(state["map"][self.x][self.y])
-
-	def add_ship(self, name):
-		old = self.variables["ships"].get()
-		if old == "":
-			self.variables["ships"].set(name)
-		else:
-			self.variables["ships"].set(old+", "+name)
-		color = "#000033"
-		self.set_color(color)
-
 	def place_base(self,base_type):
 		game.place_base(self.x,self.y,base_type)
 		force_update.set()
@@ -285,7 +275,7 @@ class SectorMapFrame(TK.Frame):
 		TK.Label(self, fg="red", 	textvariable=sector["enemies_short"]).grid	(row=0, column=0, sticky="NW")
 		TK.Label(self, fg="red", 	textvariable=sector["difficulty_short"], anchor="e").grid(row=0, column=2, sticky="NE")
 		TK.Label(self, fg="yellow", textvariable=sector["bases_short"]).grid	(row=1, column=0, columnspan=2, sticky="NW")
-		TK.Label(self, fg="#00fc00",textvariable=sector["ships"]).grid			(row=2, column=0, columnspan=3, sticky="NW")
+		TK.Label(self, fg="#00fc00",textvariable=sector["client_inside"]).grid	(row=2, column=0, columnspan=3, sticky="NW")
 		TK.Label(self, fg="white", 	textvariable=sector["coordinates"]).grid	(row=3, column=0, sticky="SW")
 		self.bind("<1>", sector.on_click)
 		self.bind("<3>", sector.on_right_click)
@@ -317,7 +307,7 @@ class SectorInfoFrame(InfoFrame):
 			VariableLabel(self, fg=sector_text_color, text="Fire Bases", 		textvariable=sector["fire_bases"], 	),
 			VariableLabel(self, fg=sector_text_color, text="Sector Name", 		textvariable=sector["name"], 			),
 			VariableLabel(self, fg=sector_text_color, text="Terrain", 			textvariable=sector["terrain_string"], ),
-			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["ships"], 		wraplength=240, ),
+			VariableLabel(self, fg=sector_text_color, text="Active Ships", 		textvariable=sector["client_inside"], 		wraplength=240, ),
 		]
 
 		self.bind("<3>", sector.on_right_click)
@@ -691,25 +681,17 @@ def update():
 			if "strategy_points" in updates["admiral"]:
 				strategy_points.set(str(state["admiral"]["strategy_points"]))
 
-		if "ships" in updates:
-			for x in range(0,8):
-				for y in range(0,8):
-					map_data[x][y].reset_ships()
-			for k in state["ships"]:
-				ip,port = k
-				name,x,y,_,enemies = state["ships"][k]
-				if x > 0:
-					sector = chr(x+ord('A')) + str(y+1)
-					map_data[x][y].add_ship(name)
-				else:	
-					sector = None
-				if k not in tech_frame:
-					tech_frame.add_row(k, fg="cyan")
-				tech_frame.set_row(k, Name=name, Address=str(ip))#+":"+str(port))
+		if "artemis_clients" in updates:
+			for ip, ship in state["artemis_clients"].items():
+				x = ship["battle"].get("x")
+				y = ship["battle"].get("y")
+				if ip not in tech_frame:
+					tech_frame.add_row(ip, fg="cyan")
+				tech_frame.set_row(ip, Name=ship["shipname"], Address=str(ip))#+":"+str(port))
 
-			for k in tech_frame:
-				if k not in state["ships"]:
-					tech_frame.remove_row(k)
+			for ip in tech_frame:
+				if ip not in state["artemis_clients"]:
+					tech_frame.remove_row(ip)
 			if allow_privilege("gm"):
 				info_pane.paneconfig(tech_frame, height=tech_frame.winfo_reqheight())
 

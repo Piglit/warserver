@@ -15,7 +15,6 @@ DEFAULT_SECTOR = {
 	"gm_allow":		False,
 	"hidden":		False,
 	"fog":			False,
-	"client_inside":	[],
 	"hinder_movement":	False,
 	"difficulty":	5,
 	"enemies":		0,
@@ -179,7 +178,14 @@ def create_game(save):
 			for y in range(8):
 				printable_coordinates = str(chr(ord("A")+x)) + str(y+1)
 				terrain = random.choice(["Sector","Nebula","Minefield","Asteroid Belt","Black Hole Nursery","Wildlands","Crossroads"])
-				game.map[x][y] = Box(init_sector(x=x, y=y, coordinates=printable_coordinates, seed=random.randrange(0x7fff*2), terrain=terrain))
+				dist_bh_0 = abs(x - 4) + abs(y - 0)
+				dist_bh_1 = abs(x - 0) + abs(y - 3)
+				dist_bh_2 = abs(x - 7) + abs(y - 4)
+				dist_min = min(dist_bh_0, dist_bh_1, dist_bh_2)
+				difficulty = 10 - dist_min
+				game.map[x][y] = Box(init_sector(x=x, y=y, coordinates=printable_coordinates, seed=random.randrange(0x7fff*2), terrain=terrain, rear_bases=random.randint(0,2), difficulty=difficulty, client_inside=Box(default_box=True)))
+				if (x,y) in [(6,1), (5,2), (6,3), (2,3), (2,4), (1,5), (2,1), (5,5), (6,5)]:
+					game.map[x][y].hidden=True
 	else:
 		# keys may be strings now
 		new_map = Box()
@@ -201,14 +207,16 @@ def create_game(save):
 		game.rules.allow_interludes = True
 		game.rules.infinite_game = False
 		game.rules.invasion_mode = "beachheads"
-		game.rules.invaders_per_turn = 20
-		game.rules.seconds_per_turn = 120
-		game.rules.seconds_per_interlude = 30
+		game.rules.invaders_per_turn = 60
+		game.rules.seconds_per_turn = 30*60
+		game.rules.seconds_per_interlude = 10*60
 		game.rules.enemies_dont_go_direction = "none"
 		game.map[4][0].beachhead_weight = 1.0
+		game.map[0][3].beachhead_weight = 1.0
+		game.map[7][4].beachhead_weight = 1.0
 	if not game.turn:
 		game.turn = Box(default_box=True)
-		game.turn.turn_number = 1
+		game.turn.turn_number = 0
 		game.turn.interlude = False
 		game.turn.max_turns = 10 
 	if not game.admiral:

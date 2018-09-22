@@ -116,8 +116,9 @@ def _release_ship(client):
 			x = c.battle.x
 			y = c.battle.y
 			cs = game.map[x][y].client_inside
+			print(cs)
 			if client in cs:
-				cs.remove(client)
+				del cs[client]
 				updated("map",x,y)
 		c.in_combat = False 
 		updated("artemis_clients", client)
@@ -198,9 +199,7 @@ def _start_battle(client, sector):
 		c.battle.terrain = sector.terrain
 		c.battle.unknown = int(sector.get("unknown",0))
 		c.log[t] = ("enter_sector", sector.coordinates)
-		if not sector.client_inside:
-			sector.client_inside = set()
-		sector.client_inside.add(client)
+		sector.client_inside[client] = c.shipname
 		updated("artemis_clients", client)
 		updated("map",x,y)
 		return copy.deepcopy(c.battle)
@@ -214,8 +213,8 @@ def enter_sector(x, y, shipname, client):
 	You can return None, to forbid that client enters that setor now.
 	"""
 
+	client = client[0]
 	_release_ship(client)
-
 	with game._lock:
 		t = time.time()
 		sector = game.map[x][y]
@@ -232,6 +231,7 @@ def kills_in_sector(shipname, id, kills, client):
 	This is called after an Artemis client killed one or more enemies.
 	The client still resides in that sector.
 	"""
+	client = client[0]
 	with game._lock:
 		t = time.time()
 		c = game.artemis_clients[client]
@@ -254,6 +254,7 @@ def clear_sector(shipname, id, client):
 	The client has defeated all enemies in that sector.
 	"""
 
+	client = client[0]
 	with game._lock:
 		t = time.time()
 		c = game.artemis_clients[client]
@@ -265,20 +266,21 @@ def clear_sector(shipname, id, client):
 			package_arrived_in_interlude = True
 		battle = c.battle
 		assert battle.id == id
+		sector = game.map[battle.x][battle.y]
 		if package_arrived_in_interlude:
 			if battle.enemies > 0:
 				return	#invalid
 		else:
-			sector = game.map[battle.x][battle.y]
 			sector.enemies = 0
 		c.log[t] = ("clear",(battle.x, battle.y))	
 		_release_ship(client)	#_release_ship updates
 		game.admiral.strategy_points += 1
 		updated("admiral")
-	log(shipname + str(client) + " cleared " + str(sector.coordinates))
+	log(shipname + str(c) + " cleared " + str(sector.coordinates))
 
 def disconnect_client(self, client):
 	"""When a client disconects, free the sector"""
+	client = client[0]
 	_release_ship(client)
 
 def register_notification(event):
