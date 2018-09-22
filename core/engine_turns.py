@@ -160,7 +160,7 @@ def enemies_spawn():
 					sector["enemies"] += enemies 
 					remaining_enemies -= enemies
 				while remaining_enemies > 0: 
-					for w, sector in sorted(invading_sectors):
+					for w, sector in invading_sectors:
 						if remaining_enemies > 0:
 							sector["enemies"] += 1
 							remaining_enemies -= 1
