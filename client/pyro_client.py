@@ -25,7 +25,7 @@ terrain_types = [
 	"Crossroads",               
 ]
 
-PRIVILEGE_LEVEL = "admiral"
+PRIVILEGE_LEVEL = "gm"
 privilege_flags = {	#binary flags!
 	"gm-admiral":	3,
 	"gm":		2,
