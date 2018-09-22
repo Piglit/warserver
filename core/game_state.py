@@ -67,6 +67,7 @@ def init_sector(**kwargs):
 #		-get_remaining()
 #	-artemis_clients
 #		-in_combat(bool)
+#		-log
 #		-last_update
 #		-battle
 #			-id

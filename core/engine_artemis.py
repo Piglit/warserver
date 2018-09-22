@@ -43,7 +43,9 @@ from core.game_state import updated
 #	-_countdown
 #		-get_remaining()
 #	-artemis_clients
+#		-shipname
 #		-in_combat(bool)
+#		-log
 #		-battle
 #			-id
 #			-x
